@@ -40,3 +40,11 @@ export const panchangApi = {
 export const horoscopeApi = {
   getBySign: (sign) => request(`/horoscope/today/${sign}`),
 };
+
+export const kundliApi = {
+  generate: (dateOfBirth, birthTime, birthPlace) =>
+    request('/kundli/generate', {
+      method: 'POST',
+      body: JSON.stringify({ dateOfBirth, birthTime, birthPlace }),
+    }),
+};

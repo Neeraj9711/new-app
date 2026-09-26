@@ -20,7 +20,7 @@ export default function Footer() {
               <li><Link to="/chat">{t('footer.chat')}</Link></li>
               <li><Link to="/horoscope">{t('footer.horoscope')}</Link></li>
               <li><Link to="/panchang">{t('footer.panchang')}</Link></li>
-              <li><Link to="/chat">{t('footer.kundli')}</Link></li>
+              <li><Link to="/kundli">{t('footer.kundli')}</Link></li>
             </ul>
           </div>
           <div>

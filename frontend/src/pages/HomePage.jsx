@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AI_SERVICES, ZODIAC_SIGNS } from '../constants';
+import { AI_SERVICES, ZODIAC_SIGNS, rashifalPath } from '../constants';
 import { useLanguage } from '../context/LanguageContext';
 
 function Stars({ count, ariaLabel }) {
@@ -102,7 +102,7 @@ export default function HomePage() {
           <p className="section-sub">{t('home.horoscopeSub')}</p>
           <div className="zodiac-grid">
             {ZODIAC_SIGNS.map((z) => (
-              <Link key={z.sign} to="/horoscope" className="zodiac-tile" state={{ sign: z.sign }}>
+              <Link key={z.sign} to={rashifalPath(z)} className="zodiac-tile">
                 <span className="zodiac-symbol">{z.symbol}</span>
                 <span className="zodiac-name">{t(`zodiac.${z.sign}`)}</span>
               </Link>

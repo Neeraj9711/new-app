@@ -1313,3 +1313,76 @@ input {
     border-radius: 18px;
   }
 }
+
+.seo-intro {
+  max-width: 46rem;
+  margin: 0 0 1.25rem;
+  color: var(--text-light);
+  line-height: 1.7;
+}
+
+.seo-form {
+  display: grid;
+  gap: 1rem;
+  max-width: 32rem;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.seo-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.seo-form input {
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.form-error {
+  color: #b42318;
+  font-weight: 600;
+}
+
+.kundli-result {
+  margin-top: 1.5rem;
+}
+
+.kundli-preds {
+  margin: 1rem 0 1.25rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.kundli-preds p {
+  margin: 0;
+  color: var(--text-light);
+  line-height: 1.6;
+}
+
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.15rem;
+  border-radius: 999px;
+  background: #25d366;
+  color: #fff;
+  font-weight: 700;
+}
+
+.share-btn:hover {
+  filter: brightness(0.95);
+}
+
+.zodiac-item {
+  color: inherit;
+}

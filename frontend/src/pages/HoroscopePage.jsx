@@ -1,19 +1,31 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { ZODIAC_SIGNS } from '../constants';
+import { Link, useParams } from 'react-router-dom';
+import { ZODIAC_SIGNS, getZodiacBySlug, rashifalPath } from '../constants';
 import { horoscopeApi } from '../services/api';
 import StarRating from '../components/StarRating';
+import ShareButton from '../components/ShareButton';
 import { useLanguage } from '../context/LanguageContext';
+import { resolveZodiac } from '../../../seoConfig.js';
 
 export default function HoroscopePage() {
   const { t } = useLanguage();
-  const location = useLocation();
-  const initial = location.state?.sign || 'Cancer';
-  const [selected, setSelected] = useState(initial);
+  const { slug } = useParams();
+  const fromUrl = getZodiacBySlug(slug);
+  const [selected, setSelected] = useState(fromUrl?.sign || '');
   const [horoscope, setHoroscope] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(fromUrl));
 
   useEffect(() => {
+    const match = getZodiacBySlug(slug);
+    setSelected(match?.sign || '');
+  }, [slug]);
+
+  useEffect(() => {
+    if (!selected) {
+      setHoroscope(null);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -43,27 +55,42 @@ export default function HoroscopePage() {
     return () => { cancelled = true; };
   }, [selected, t]);
 
+  const zodiacMeta = resolveZodiac(selected) || fromUrl;
+  const pagePath = zodiacMeta ? rashifalPath(zodiacMeta) : '/horoscope';
+
   return (
     <div className="page">
       <div className="container">
         <header className="page-header">
-          <h1>{t('horoscope.title')}</h1>
-          <p>{t('horoscope.subtitle')}</p>
+          <h1>
+            {zodiacMeta
+              ? t('horoscope.signTitle').replace('{{sign}}', t(`zodiac.${zodiacMeta.sign}`))
+              : t('horoscope.title')}
+          </h1>
+          <p>{zodiacMeta ? t('horoscope.signSubtitle') : t('horoscope.subtitle')}</p>
         </header>
+
+        <p className="seo-intro">
+          {zodiacMeta ? t('horoscope.signIntro').replace('{{sign}}', t(`zodiac.${zodiacMeta.sign}`)) : t('horoscope.indexIntro')}
+        </p>
 
         <div className="zodiac-bar">
           {ZODIAC_SIGNS.map((z) => (
-            <button
+            <Link
               key={z.sign}
-              type="button"
+              to={rashifalPath(z)}
               className={`zodiac-item ${selected === z.sign ? 'active' : ''}`}
               onClick={() => setSelected(z.sign)}
             >
               <span>{z.symbol}</span>
               <span>{t(`zodiac.${z.sign}`)}</span>
-            </button>
+            </Link>
           ))}
         </div>
+
+        {!selected && (
+          <p className="section-sub">{t('horoscope.pickSign')}</p>
+        )}
 
         {loading ? (
           <div className="page-loading">{t('horoscope.loading')}</div>
@@ -109,6 +136,14 @@ export default function HoroscopePage() {
                 <span className="lucky-label">{t('horoscope.luckyColor')}</span>
                 <span className="lucky-value">{horoscope.luckyColor}</span>
               </div>
+            </div>
+
+            <div className="hero-actions" style={{ marginTop: '1.25rem' }}>
+              <ShareButton
+                path={pagePath}
+                text={t('horoscope.shareText').replace('{{sign}}', t(`zodiac.${horoscope.sign}`))}
+              />
+              <Link to="/kundli" className="btn btn-outline">{t('horoscope.ctaKundli')}</Link>
             </div>
           </article>
         )}

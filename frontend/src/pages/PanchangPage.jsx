@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { panchangApi } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
+import ShareButton from '../components/ShareButton';
 
 export default function PanchangPage() {
   const { t } = useLanguage();
@@ -74,6 +75,7 @@ export default function PanchangPage() {
           <h1>{t('panchang.title')}</h1>
           <p>{t('panchang.subtitle')}</p>
         </header>
+        <p className="seo-intro">{t('panchang.intro')}</p>
 
         <div className="tab-bar">
           {tabs.map((item) => (
@@ -105,6 +107,9 @@ export default function PanchangPage() {
                       <strong>{value ?? '—'}</strong>
                     </div>
                   ))}
+                </div>
+                <div className="hero-actions" style={{ marginTop: '1.25rem' }}>
+                  <ShareButton path="/panchang" text={t('panchang.shareText')} />
                 </div>
               </div>
             )}

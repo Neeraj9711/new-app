@@ -11,6 +11,7 @@ import chatRoutes from './routes/chat.js';
 import kundliRoutes from './routes/kundli.js';
 import panchangRoutes from './routes/panchang.js';
 import horoscopeRoutes from './routes/horoscope.js';
+import { SITE_ORIGIN, getSeoForPath, sitemapPaths } from './seoConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,13 +43,67 @@ app.use('/api/kundli', kundliRoutes);
 app.use('/api/panchang', panchangRoutes);
 app.use('/api/horoscope', horoscopeRoutes);
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/"/g, '&quot;');
+}
+
+function injectSeoHtml(html, pathname) {
+  const seo = getSeoForPath(pathname);
+  let out = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(seo.title)}</title>`);
+  if (out.includes('name="description"')) {
+    out = out.replace(
+      /<meta name="description" content="[^"]*"\s*\/?>/,
+      `<meta name="description" content="${escapeHtml(seo.description)}" />`,
+    );
+  }
+  out = out.replace(/<link rel="canonical"[^>]*>/g, '');
+  out = out.replace(/<meta property="og:[^"]+" content="[^"]*"\s*\/?>/g, '');
+  const extra = `
+    <link rel="canonical" href="${escapeHtml(seo.canonical)}" />
+    <meta property="og:title" content="${escapeHtml(seo.title)}" />
+    <meta property="og:description" content="${escapeHtml(seo.description)}" />
+    <meta property="og:url" content="${escapeHtml(seo.canonical)}" />
+    <meta property="og:type" content="website" />
+  `;
+  out = out.replace('</head>', `${extra}</head>`);
+  const prerender = `
+    <noscript>
+      <h1>${escapeHtml(seo.h1)}</h1>
+      <p>${escapeHtml(seo.body)}</p>
+    </noscript>
+  `;
+  return out.replace('</body>', `${prerender}</body>`);
+}
+
+app.get('/robots.txt', (_req, res) => {
+  res.type('text/plain').send(
+    `User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${SITE_ORIGIN}/sitemap.xml\n`,
+  );
+});
+
+app.get('/sitemap.xml', (_req, res) => {
+  const lastmod = new Date().toISOString().split('T')[0];
+  const urls = sitemapPaths().map((path) => {
+    const loc = path === '/' ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${path}`;
+    const priority = path === '/' ? '1.0' : path.includes('rashifal') || path === '/kundli' || path === '/panchang' ? '0.9' : '0.7';
+    return `<url><loc>${loc}</loc><lastmod>${lastmod}</lastmod><changefreq>daily</changefreq><priority>${priority}</priority></url>`;
+  }).join('');
+  res.type('application/xml').send(
+    `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`,
+  );
+});
+
 // ——— Web UI only (does not handle /api/*) ———
 if (fs.existsSync(clientDir)) {
-  app.use(express.static(clientDir));
+  app.use(express.static(clientDir, { index: false }));
   app.get(/^(?!\/api).*/, (req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-    res.sendFile(clientIndex, (err) => {
-      if (err) next();
+    fs.readFile(clientIndex, 'utf8', (err, html) => {
+      if (err) return next(err);
+      res.type('html').send(injectSeoHtml(html, req.path));
     });
   });
 }
