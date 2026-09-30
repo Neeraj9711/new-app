@@ -26,9 +26,14 @@ export default function AdminPage() {
   const [activity, setActivity] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   async function load(event) {
     event?.preventDefault();
+    if (!secret.trim()) {
+      setError(t('auth.adminNeedSecret'));
+      return;
+    }
     setError('');
     setLoading(true);
     try {
@@ -39,9 +44,11 @@ export default function AdminPage() {
       ]);
       setUsers(userData.users || []);
       setActivity(activityData.activity || []);
+      setLoaded(true);
     } catch (err) {
       setUsers([]);
       setActivity([]);
+      setLoaded(false);
       setError(err.message || t('auth.adminFailed'));
     } finally {
       setLoading(false);
@@ -53,6 +60,7 @@ export default function AdminPage() {
       <div className="container">
         <h1>{t('auth.adminTitle')}</h1>
         <p>{t('auth.adminBody')}</p>
+        <p className="auth-hint">{t('auth.adminHint')}</p>
         <form className="admin-secret" onSubmit={load}>
           <input
             type="password"
@@ -67,7 +75,7 @@ export default function AdminPage() {
         </form>
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <h2>{t('auth.usersHeading')} ({users.length})</h2>
+        <h2>{t('auth.usersHeading')} ({loaded ? users.length : t('auth.adminNotLoaded')})</h2>
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
@@ -95,7 +103,7 @@ export default function AdminPage() {
           </table>
         </div>
 
-        <h2>{t('auth.activityHeading')} ({activity.length})</h2>
+        <h2>{t('auth.activityHeading')} ({loaded ? activity.length : t('auth.adminNotLoaded')})</h2>
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
