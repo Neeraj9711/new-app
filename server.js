@@ -6,7 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { connectDB } from './db/connect.js';
-import { isGptEnabled, OPENAI_MODEL } from './services/aiService.js';
+import { getAiProvider, GEMINI_MODEL, OPENAI_MODEL } from './services/aiService.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import chatRoutes from './routes/chat.js';
@@ -36,7 +36,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     app: 'Astro AI',
     version: '1.0.0',
-    ai: isGptEnabled() ? 'gpt' : 'fallback',
+    ai: getAiProvider(),
   });
 });
 
@@ -116,9 +116,12 @@ if (fs.existsSync(clientDir)) {
   });
 }
 
-const aiMode = isGptEnabled()
-  ? `GPT (${OPENAI_MODEL})`
-  : 'Fallback templates (set OPENAI_API_KEY for GPT replies)';
+const provider = getAiProvider();
+const aiMode = provider === 'gemini'
+  ? `Gemini (${GEMINI_MODEL})`
+  : provider === 'gpt'
+    ? `GPT (${OPENAI_MODEL})`
+    : 'Fallback templates (set GEMINI_API_KEY for Gemini Pro replies)';
 
 async function start() {
   try {

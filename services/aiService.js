@@ -1,5 +1,12 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import { formatKundliForAI } from './kundliService.js';
+
+const geminiKey = (() => {
+  const raw = String(process.env.GEMINI_API_KEY || '').trim();
+  if (!raw || raw === 'your_gemini_api_key_here') return null;
+  return raw;
+})();
 
 const openaiKey = (() => {
   const raw = String(process.env.OPENAI_API_KEY || '').trim();
@@ -7,11 +14,16 @@ const openaiKey = (() => {
   return raw;
 })();
 
+const genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
+const GEMINI_MODEL = String(process.env.GEMINI_MODEL || 'gemini-1.5-pro').trim() || 'gemini-1.5-pro';
+
 const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim() || 'gpt-4o-mini';
 
-export function isGptEnabled() {
-  return Boolean(openai);
+export function getAiProvider() {
+  if (genAI) return 'gemini';
+  if (openai) return 'gpt';
+  return 'fallback';
 }
 
 function resolveLang(language) {
@@ -52,7 +64,7 @@ const STEP_PROMPTS = {
     greeting: 'उपयोगकर्ता का गर्मजोशी से स्वागत करें। अपना परिचय पंडित जी के रूप में दें और जन्म तिथि (DD/MM/YYYY) पूछें।',
     dob: 'जन्म तिथि के लिए धन्यवाद। अब सटीक जन्म समय (जैसे 10:30 AM) पूछें। लग्न और भावों की गणना के लिए समय महत्वपूर्ण है।',
     birthTime: 'जन्म समय नोट कर लिया। अब जन्म स्थान (शहर, राज्य/देश) पूछें।',
-    birthPlace: 'जन्म स्थान दर्ज हो गया और कुंडली तैयार है। जन्म कुंडली का संक्षिप्त सारांश (सूर्य, चंद्र, लग्न, नक्षत्र, दशा) दें, फिर उनकी समस्या या प्रश्न पूछें।',
+    birthPlace: 'जन्म स्थान दर्ज हो गया और कुंडली तैयार है। 4 पूरे पैराग्राफ में कुंडली समझाएं (सूर्य, चंद्र, लग्न, नक्षत्र, दशा, ग्रह) फिर प्रश्न पूछें। एक सूची भर न दें।',
     problem: 'उपयोगकर्ता अपनी समस्या या प्रश्न साझा कर रहा है। 4–6 पूरे पैराग्राफ में विस्तृत वैदिक पढ़ाई दें — सीधा उत्तर, कुंडली, समय, उपाय, फिर एक प्रश्न।',
     consultation: 'परामर्श जारी रखें। नवीनतम प्रश्न का 4–6 पैराग्राफ में विस्तृत उत्तर दें। एक-पंक्ति जवाब मना है।',
   },
@@ -60,7 +72,7 @@ const STEP_PROMPTS = {
     greeting: `Greet the user warmly as Pandit Ji from Astro AI. Introduce yourself briefly and ask for their Date of Birth (DD/MM/YYYY or any format). Make it feel personal and welcoming.`,
     dob: `Thank them for sharing their date of birth. Now ask for their exact Birth Time (e.g., 10:30 AM). Explain that accurate time is important for Lagna and house calculations.`,
     birthTime: `Acknowledge the birth time. Now ask for their Place of Birth (city, state/country). Explain this helps with timezone and geographic coordinates for the Kundli.`,
-    birthPlace: `The user's birth place has been recorded and their Kundli is now generated. Present a brief, warm summary of their birth chart (Sun, Moon, Lagna, Nakshatra, Dasha), then ask what concern or question they have.`,
+    birthPlace: `The birth place is recorded and the Kundli is ready. Write 4 full paragraphs explaining this chart (Sun, Moon, Lagna, Nakshatra, Dasha, planets and what to ask next). Do not give a short bullet list.`,
     problem: `The user is sharing their concern. Write a FULL consultation of 4–6 paragraphs: answer the exact question, explain houses/planets/dasha from this Kundli, give timing, give remedies, then one follow-up. Do not write a short template.`,
     consultation: `Continue the consultation in 4–6 full paragraphs. Answer the latest question in depth using this Kundli. One-line answers are forbidden.`,
   },
@@ -275,6 +287,21 @@ function buildChatHistory(session, userMessage) {
   }));
 }
 
+async function callGemini(session, userMessage, step) {
+  const history = buildChatHistory(session, userMessage).map((msg) => ({
+    role: msg.role === 'user' ? 'user' : 'model',
+    parts: [{ text: msg.content }],
+  }));
+  const model = genAI.getGenerativeModel({
+    model: GEMINI_MODEL,
+    systemInstruction: buildSystemContext(session, step),
+    generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+  });
+  const chat = model.startChat({ history });
+  const result = await chat.sendMessage(userMessage);
+  return result.response.text();
+}
+
 async function callGpt(session, userMessage, step) {
   const result = await openai.chat.completions.create({
     model: OPENAI_MODEL,
@@ -290,44 +317,54 @@ async function callGpt(session, userMessage, step) {
 }
 
 export async function getAIResponse(session, userMessage, step) {
-  if (!openai) {
-    console.warn('OPENAI_API_KEY is not set — using detailed template replies');
-    return { content: fallbackResponse(session, userMessage, step), source: 'fallback' };
+  let lastError = null;
+  if (genAI) {
+    try {
+      const content = (await callGemini(session, userMessage, step))?.trim();
+      if (content) return { content, source: 'gemini' };
+    } catch (err) {
+      lastError = err.message;
+      console.error('Gemini error:', err.message);
+    }
   }
-  try {
-    const content = (await callGpt(session, userMessage, step))?.trim();
-    if (content) return { content, source: 'gpt' };
-    return { content: fallbackResponse(session, userMessage, step), source: 'fallback' };
-  } catch (err) {
-    console.error('OpenAI error:', err.message);
-    return { content: fallbackResponse(session, userMessage, step), source: 'fallback', error: err.message };
+  if (openai) {
+    try {
+      const content = (await callGpt(session, userMessage, step))?.trim();
+      if (content) return { content, source: 'gpt' };
+    } catch (err) {
+      lastError = err.message;
+      console.error('OpenAI error:', err.message);
+    }
   }
+  if (!genAI && !openai) {
+    console.warn('No GEMINI_API_KEY or OPENAI_API_KEY — using detailed template replies');
+  }
+  return {
+    content: fallbackResponse(session, userMessage, step),
+    source: 'fallback',
+    error: lastError,
+  };
 }
 
 export async function getQuickAnswer(question, kundli = null, language = 'hi') {
   const lang = resolveLang(language);
-  if (!openai) {
-    return fallbackResponse({ kundli, messages: [], language: lang }, question, 'consultation');
+  const session = { kundli, messages: [], language: lang };
+  if (genAI) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: GEMINI_MODEL,
+        systemInstruction: SYSTEM_PROMPTS[lang],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+      });
+      const kundliContext = formatKundliForAI(kundli);
+      const result = await model.generateContent(`${kundliContext ? `${kundliContext}\n\n` : ''}User question: ${question}`);
+      const text = result.response.text();
+      if (text) return text;
+    } catch (err) {
+      console.error('Gemini quick answer error:', err.message);
+    }
   }
-  const kundliContext = formatKundliForAI(kundli);
-  try {
-    const result = await openai.chat.completions.create({
-      model: OPENAI_MODEL,
-      temperature: 0.6,
-      max_tokens: 2500,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPTS[lang] },
-        {
-          role: 'user',
-          content: `${kundliContext ? `${kundliContext}\n\n` : ''}User question: ${question}`,
-        },
-      ],
-    });
-    return result.choices?.[0]?.message?.content
-      || fallbackResponse({ kundli, language: lang }, question, 'consultation');
-  } catch {
-    return fallbackResponse({ kundli, language: lang }, question, 'consultation');
-  }
+  return fallbackResponse(session, question, 'consultation');
 }
 
-export { OPENAI_MODEL };
+export { GEMINI_MODEL, OPENAI_MODEL };
