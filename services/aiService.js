@@ -1,12 +1,12 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { formatKundliForAI } from './kundliService.js';
 
-const geminiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'
-  ? process.env.GEMINI_API_KEY
+const openaiKey = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'
+  ? process.env.OPENAI_API_KEY
   : null;
 
-const genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 function resolveLang(language) {
   return language === 'en' ? 'en' : 'hi';
@@ -20,12 +20,13 @@ const SYSTEM_PROMPTS = {
 नियम:
 - उपलब्ध होने पर उपयोगकर्ता की कुंडली विवरण का संदर्भ दें
 - विवाह, करियर, स्वास्थ्य, वित्त, संतान/पुत्र-कन्या और अन्य विषयों पर व्यक्तिगत मार्गदर्शन दें
-- हमेशा पहले उपयोगकर्ता के सटीक प्रश्न का उत्तर दें
+- हमेशा पहले उपयोगकर्ता के सटीक प्रश्न का उत्तर दें — सामान्य कुंडली सारांश से शुरुआत न करें
 - उत्तर के बाद एक प्रासंगिक अनुवर्ती प्रश्न पूछें
 - पंचांग प्रश्नों (एकादशी, अमावस्या) पर तिथियां और आध्यात्मिक महत्व बताएं
 - प्रोत्साहन दें पर ईमानदार रहें; उपाय (मंत्र, रत्न, उपवास) सुझाएं
 - उत्तर संक्षिप्त रखें (2-4 पैराग्राफ), मोबाइल पर पढ़ने में आसान
-- 100% निश्चितता का दावा न करें — "सितारे संकेत करते हैं", "आपकी कुंडली बताती है" जैसे वाक्य प्रयोग करें`,
+- 100% निश्चितता का दावा न करें — "सितारे संकेत करते हैं", "आपकी कुंडली बताती है" जैसे वाक्य प्रयोग करें
+- यदि प्रश्न सीधा है (हाँ/नहीं, समय, नौकरी, विवाह), पहले सीधा उत्तर दें, फिर संक्षिप्त व्याख्या करें`,
 
   en: `You are Pandit Ji, a wise and compassionate Vedic astrologer on the Astro AI app.
 You respond entirely in English. Use a warm, respectful tone.
@@ -33,12 +34,13 @@ You respond entirely in English. Use a warm, respectful tone.
 Rules:
 - Always reference the user's Kundli details when available (Sun sign, Moon sign, Lagna, Nakshatra, planetary positions)
 - Give specific, thoughtful predictions about marriage, career, health, finance, children/progeny, and any topic the user asks
-- ALWAYS answer the user's exact question first — do not give a generic reading when they ask something specific
+- ALWAYS answer the user's exact question first in the opening sentences — never open with a generic chart dump or a canned horoscope
 - After answering, ALWAYS ask one relevant follow-up question to deepen the consultation
 - For Panchang questions (Ekadashi, Amavasya, Purnima), provide dates and spiritual significance
 - Be encouraging but honest. Mention remedies (mantras, gemstones, fasting) when appropriate
 - Keep responses concise (2-4 paragraphs) and easy to read on mobile
-- Never claim 100% certainty — use phrases like "the stars indicate", "your chart suggests"`,
+- Never claim 100% certainty — use phrases like "the stars indicate", "your chart suggests"
+- If the question is specific (timing, yes/no, person, job), give a direct chart-based answer, then a short explanation`,
 };
 
 const STEP_PROMPTS = {
@@ -182,7 +184,7 @@ function fallbackResponse(session, userMessage, step) {
     : 'I am here to guide you. Please share more details so I can read your stars accurately. 🙏';
 }
 
-function buildGeminiContext(session, userMessage, step) {
+function buildSystemContext(session, step) {
   const lang = resolveLang(session.language);
   const kundliContext = formatKundliForAI(session.kundli);
   const stepInstruction = STEP_PROMPTS[lang]?.[step];
@@ -195,63 +197,70 @@ function buildGeminiContext(session, userMessage, step) {
   return context;
 }
 
-function buildGeminiHistory(session, userMessage) {
+function buildChatHistory(session, userMessage) {
   const history = session.messages.slice(-10);
   const lastIsCurrent = history.at(-1)?.role === 'user' && history.at(-1)?.content === userMessage;
   let historyToSend = lastIsCurrent ? history.slice(0, -1) : history;
   const firstUserIdx = historyToSend.findIndex((msg) => msg.role === 'user');
   historyToSend = firstUserIdx === -1 ? [] : historyToSend.slice(firstUserIdx);
   return historyToSend.map((msg) => ({
-    role: msg.role === 'user' ? 'user' : 'model',
-    parts: [{ text: msg.content }],
+    role: msg.role === 'user' ? 'user' : 'assistant',
+    content: msg.content,
   }));
 }
 
-async function callGemini(session, userMessage, step) {
-  const systemInstruction = buildGeminiContext(session, userMessage, step);
-  const history = buildGeminiHistory(session, userMessage);
-  const model = genAI.getGenerativeModel({
-    model: GEMINI_MODEL,
-    systemInstruction,
-    generationConfig: { temperature: 0.8, maxOutputTokens: 4096 },
+async function callGpt(session, userMessage, step) {
+  const result = await openai.chat.completions.create({
+    model: OPENAI_MODEL,
+    temperature: 0.6,
+    max_tokens: 1200,
+    messages: [
+      { role: 'system', content: buildSystemContext(session, step) },
+      ...buildChatHistory(session, userMessage),
+      { role: 'user', content: userMessage },
+    ],
   });
-  const chat = model.startChat({ history });
-  const result = await chat.sendMessage(userMessage);
-  return result.response.text();
+  return result.choices?.[0]?.message?.content || '';
 }
 
 export async function getAIResponse(session, userMessage, step) {
-  if (!genAI) {
+  if (!openai) {
     return { content: fallbackResponse(session, userMessage, step), source: 'fallback' };
   }
   try {
-    const content = (await callGemini(session, userMessage, step))?.trim();
-    if (content) return { content, source: 'gemini' };
+    const content = (await callGpt(session, userMessage, step))?.trim();
+    if (content) return { content, source: 'gpt' };
     return { content: fallbackResponse(session, userMessage, step), source: 'fallback' };
   } catch (err) {
-    console.error('Gemini error:', err.message);
+    console.error('OpenAI error:', err.message);
     return { content: fallbackResponse(session, userMessage, step), source: 'fallback', error: err.message };
   }
 }
 
 export async function getQuickAnswer(question, kundli = null, language = 'hi') {
   const lang = resolveLang(language);
-  if (!genAI) {
+  if (!openai) {
     return fallbackResponse({ kundli, messages: [], language: lang }, question, 'consultation');
   }
   const kundliContext = formatKundliForAI(kundli);
-  const prompt = `${kundliContext ? kundliContext + '\n\n' : ''}User question: ${question}`;
   try {
-    const model = genAI.getGenerativeModel({
-      model: GEMINI_MODEL,
-      systemInstruction: SYSTEM_PROMPTS[lang],
-      generationConfig: { temperature: 0.8, maxOutputTokens: 4096 },
+    const result = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      temperature: 0.6,
+      max_tokens: 1200,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPTS[lang] },
+        {
+          role: 'user',
+          content: `${kundliContext ? `${kundliContext}\n\n` : ''}User question: ${question}`,
+        },
+      ],
     });
-    const result = await model.generateContent(prompt);
-    return result.response.text() || fallbackResponse({ kundli, language: lang }, question, 'consultation');
+    return result.choices?.[0]?.message?.content
+      || fallbackResponse({ kundli, language: lang }, question, 'consultation');
   } catch {
     return fallbackResponse({ kundli, language: lang }, question, 'consultation');
   }
 }
 
-export { GEMINI_MODEL };
+export { OPENAI_MODEL };

@@ -110,9 +110,9 @@ if (fs.existsSync(clientDir)) {
   });
 }
 
-const aiMode = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'
-  ? `Gemini (${process.env.GEMINI_MODEL || 'gemini-flash-latest'})`
-  : 'Fallback templates (set GEMINI_API_KEY in backend/.env for real AI)';
+const aiMode = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'
+  ? `GPT (${process.env.OPENAI_MODEL || 'gpt-4o-mini'})`
+  : 'Fallback templates (set OPENAI_API_KEY for GPT replies)';
 
 async function start() {
   try {
