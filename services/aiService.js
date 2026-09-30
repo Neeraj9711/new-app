@@ -21,12 +21,11 @@ const SYSTEM_PROMPTS = {
 - उपलब्ध होने पर उपयोगकर्ता की कुंडली विवरण का संदर्भ दें
 - विवाह, करियर, स्वास्थ्य, वित्त, संतान/पुत्र-कन्या और अन्य विषयों पर व्यक्तिगत मार्गदर्शन दें
 - हमेशा पहले उपयोगकर्ता के सटीक प्रश्न का उत्तर दें — सामान्य कुंडली सारांश से शुरुआत न करें
-- उत्तर के बाद एक प्रासंगिक अनुवर्ती प्रश्न पूछें
+- उत्तर 4 से 6 पूरे पैराग्राफ में लिखें। प्रत्येक पैराग्राफ 4–6 वाक्य का हो। एक-दो पंक्ति का उत्तर कभी न दें
+- पहले पैराग्राफ में सीधे प्रश्न का उत्तर, फिर भाव/ग्रह/दशा, फिर समय, फिर उपाय, अंत में एक अनुवर्ती प्रश्न
 - पंचांग प्रश्नों (एकादशी, अमावस्या) पर तिथियां और आध्यात्मिक महत्व बताएं
-- प्रोत्साहन दें पर ईमानदार रहें; उपाय (मंत्र, रत्न, उपवास) सुझाएं
-- उत्तर संक्षिप्त रखें (2-4 पैराग्राफ), मोबाइल पर पढ़ने में आसान
-- 100% निश्चितता का दावा न करें — "सितारे संकेत करते हैं", "आपकी कुंडली बताती है" जैसे वाक्य प्रयोग करें
-- यदि प्रश्न सीधा है (हाँ/नहीं, समय, नौकरी, विवाह), पहले सीधा उत्तर दें, फिर संक्षिप्त व्याख्या करें`,
+- प्रोत्साहन दें पर ईमानदार रहें; ठोस उपाय (मंत्र, रत्न, उपवास, दान) विस्तार से सुझाएं
+- 100% निश्चितता का दावा न करें — "सितारे संकेत करते हैं", "आपकी कुंडली बताती है" जैसे वाक्य प्रयोग करें`,
 
   en: `You are Pandit Ji, a wise and compassionate Vedic astrologer on the Astro AI app.
 You respond entirely in English. Use a warm, respectful tone.
@@ -35,12 +34,11 @@ Rules:
 - Always reference the user's Kundli details when available (Sun sign, Moon sign, Lagna, Nakshatra, planetary positions)
 - Give specific, thoughtful predictions about marriage, career, health, finance, children/progeny, and any topic the user asks
 - ALWAYS answer the user's exact question first in the opening sentences — never open with a generic chart dump or a canned horoscope
-- After answering, ALWAYS ask one relevant follow-up question to deepen the consultation
+- Write 4 to 6 full paragraphs. Each paragraph must have 4–6 sentences. Never give a one-line or two-line reply
+- Structure: (1) direct answer, (2) houses, planets and dasha from THIS chart, (3) likely timing, (4) practical remedies in detail, (5) one follow-up question in the last paragraph
 - For Panchang questions (Ekadashi, Amavasya, Purnima), provide dates and spiritual significance
-- Be encouraging but honest. Mention remedies (mantras, gemstones, fasting) when appropriate
-- Keep responses concise (2-4 paragraphs) and easy to read on mobile
-- Never claim 100% certainty — use phrases like "the stars indicate", "your chart suggests"
-- If the question is specific (timing, yes/no, person, job), give a direct chart-based answer, then a short explanation`,
+- Be encouraging but honest. Mention remedies (mantras, gemstones, fasting, daan) with how and when to do them
+- Never claim 100% certainty — use phrases like "the stars indicate", "your chart suggests"`,
 };
 
 const STEP_PROMPTS = {
@@ -49,16 +47,16 @@ const STEP_PROMPTS = {
     dob: 'जन्म तिथि के लिए धन्यवाद। अब सटीक जन्म समय (जैसे 10:30 AM) पूछें। लग्न और भावों की गणना के लिए समय महत्वपूर्ण है।',
     birthTime: 'जन्म समय नोट कर लिया। अब जन्म स्थान (शहर, राज्य/देश) पूछें।',
     birthPlace: 'जन्म स्थान दर्ज हो गया और कुंडली तैयार है। जन्म कुंडली का संक्षिप्त सारांश (सूर्य, चंद्र, लग्न, नक्षत्र, दशा) दें, फिर उनकी समस्या या प्रश्न पूछें।',
-    problem: 'उपयोगकर्ता अपनी समस्या या प्रश्न साझा कर रहा है। कुंडली पढ़कर सटीक प्रश्न का पहले उत्तर दें, फिर वैदिक अंतर्दृष्टि और उपाय दें। अंत में एक अनुवर्ती प्रश्न पूछें।',
-    consultation: 'परामर्श जारी रखें। नवीनतम प्रश्न का कुंडली के आधार पर सीधा उत्तर दें। सामान्य पढ़ाई दोहराएं नहीं। अंत में एक अनुवर्ती प्रश्न पूछें।',
+    problem: 'उपयोगकर्ता अपनी समस्या या प्रश्न साझा कर रहा है। 4–6 पूरे पैराग्राफ में विस्तृत वैदिक पढ़ाई दें — सीधा उत्तर, कुंडली, समय, उपाय, फिर एक प्रश्न।',
+    consultation: 'परामर्श जारी रखें। नवीनतम प्रश्न का 4–6 पैराग्राफ में विस्तृत उत्तर दें। एक-पंक्ति जवाब मना है।',
   },
   en: {
     greeting: `Greet the user warmly as Pandit Ji from Astro AI. Introduce yourself briefly and ask for their Date of Birth (DD/MM/YYYY or any format). Make it feel personal and welcoming.`,
     dob: `Thank them for sharing their date of birth. Now ask for their exact Birth Time (e.g., 10:30 AM). Explain that accurate time is important for Lagna and house calculations.`,
     birthTime: `Acknowledge the birth time. Now ask for their Place of Birth (city, state/country). Explain this helps with timezone and geographic coordinates for the Kundli.`,
     birthPlace: `The user's birth place has been recorded and their Kundli is now generated. Present a brief, warm summary of their birth chart (Sun, Moon, Lagna, Nakshatra, Dasha), then ask what concern or question they have.`,
-    problem: `The user is sharing their concern or question. Read their Kundli and answer their EXACT question directly and specifically first. Then give Vedic astrological insight, remedies if relevant, and one follow-up question.`,
-    consultation: `Continue the consultation. Answer the user's EXACT latest question directly first using their Kundli. Do not repeat generic life readings. End with one follow-up question.`,
+    problem: `The user is sharing their concern. Write a FULL consultation of 4–6 paragraphs: answer the exact question, explain houses/planets/dasha from this Kundli, give timing, give remedies, then one follow-up. Do not write a short template.`,
+    consultation: `Continue the consultation in 4–6 full paragraphs. Answer the latest question in depth using this Kundli. One-line answers are forbidden.`,
   },
 };
 
@@ -103,6 +101,70 @@ function getChildrenReading(k, userMessage = '', lang = 'hi') {
     genderNote = `\n\nRegarding a **baby girl** — Venus and Moon grace the 5th house. Your ${k?.moonSign} Moon and ${k?.nakshatra} Nakshatra favour the blessing of a daughter.`;
   }
   return `Regarding **children & progeny** — your 5th house (Putra Bhava) is influenced by **${jupiter}**, with **${fifthLord}** shaping family expansion.\n\nBased on your ${k?.sunSign || 'birth'} Sun, ${k?.lagna || 'rising'} Lagna, and ${k?.nakshatra || 'birth star'} Nakshatra, the stars indicate **${count}** in your destiny. ${k?.currentDasha || 'The current'} Dasha supports family growth in the coming years.${genderNote}\n\nFavourable periods for conception/children often align when Jupiter transits your 5th or 11th house.`;
+}
+
+function planetLine(k) {
+  const p = k?.planets || {};
+  return `Sun in ${k?.sunSign}, Moon in ${k?.moonSign}, Mars in ${p.Mars || '—'}, Mercury in ${p.Mercury || '—'}, Jupiter in ${p.Jupiter || '—'}, Venus in ${p.Venus || '—'}, Saturn in ${p.Saturn || '—'}`;
+}
+
+function detailedTopicReading(k, topic, userMessage, lang) {
+  const sun = k?.sunSign || 'your Sun sign';
+  const moon = k?.moonSign || 'your Moon sign';
+  const lagna = k?.lagna || 'your Lagna';
+  const nak = k?.nakshatra || 'your Nakshatra';
+  const dasha = k?.currentDasha || 'the current';
+  const place = k?.birthDetails?.birthPlace || '';
+  const planets = planetLine(k);
+  const q = String(userMessage || '').trim();
+
+  if (lang === 'hi') {
+    const openings = {
+      career: `आपने करियर के बारे में पूछा${q ? ` — “${q}”` : ''}। आपकी कुंडली में **${lagna} लग्न** और **${sun} सूर्य** दशम भाव (कर्म भाव) को दिशा देते हैं। ${dasha} दशा सक्रिय है, इसलिए पेशे में बदलाव या प्रगति अक्सर इसी चक्र से जुड़ती है।`,
+      marriage: `विवाह के प्रश्न पर कुंडली साफ संकेत देती है। सप्तम भाव (विवाह भाव) **${moon} चंद्र** और शुक्र की स्थिति से प्रभावित है। ${lagna} लग्न वाले जातकों में विवाह का योग धैर्य और सही समय दोनों मांगता है।`,
+      health: `स्वास्थ्य के लिए षष्ठ भाव और लग्न दोनों देखे जाते हैं। **${sun} सूर्य** शरीर की ऊर्जा दिखाता है और **${moon} चंद्र** मन-नींद को। ${dasha} दशा में दिनचर्या सुधारना फलदायी रहता है।`,
+      finance: `धन के लिए द्वितीय और एकादश भाव देखे जाते हैं। **${sun} सूर्य** और **${dasha} दशा** आय के स्रोत को रंग देते हैं। अचानक दौलत से अधिक स्थिर बचत का योग दिखता है।`,
+      education: `पंचम भाव विद्या और बुद्धि का कारक है। **${nak} नक्षत्र** सीखने की शैली बताता है। ${dasha} दशा परीक्षा या नए कोर्स के लिए सहयोगी हो सकती है।`,
+      travel: `नवम और द्वादश भाव विदेश व यात्रा दिखाते हैं। ${lagna} लग्न और ${dasha} दशा के साथ यात्रा का समय चुनना बेहतर रहता है।`,
+      general: `आपका प्रश्न कुंडली के साथ पढ़ा गया है। **${sun} सूर्य, ${moon} चंद्र, ${lagna} लग्न, ${nak} नक्षत्र** और **${dasha} दशा** मिलकर वर्तमान मार्ग बनाते हैं।`,
+    };
+    const body2 = `जन्म स्थान ${place || 'आपके बताए स्थान'} के साथ ग्रह स्थिति इस प्रकार है: ${planets}। लग्न **${lagna}** जीवन की बाहरी शैली है, चंद्र **${moon}** मन की प्रतिक्रिया, सूर्य **${sun}** उद्देश्य। नक्षत्र **${nak}** बताता है कि आप निर्णय कैसे लेते हैं — जल्दी, धीरे या चक्रों में।`;
+    const body3 = `समय के विषय में — ${dasha} महादशा में बड़े निर्णय 3–6 महीनों की खिड़की में पकते दिखते हैं, पूर्ण फल अक्सर 12–18 महीने में स्थिर होता है। शुक्र/गुरु गोचर जब लग्न या संबंधित भाव को छूते हैं, तब अवसर साफ दिखते हैं। राहु-केतु काल में जल्दबाजी से बचें।`;
+    const remedies = `उपाय व्यावहारिक रखें: प्रातः सूर्य नमस्कार या 12 सूर्य नमस्कार, सोमवार को चंद्र के लिए सफेद दान (चावल/दूध), और दशम भाव के लिए शनिवार को तेल-अन्न दान। मंत्र — करियर हेतु “ॐ सूर्याय नमः”, विवाह हेतु “ॐ शुं शुक्राय नमः”, स्वास्थ्य हेतु “ॐ चंद्राय नमः” — 108 जप, 21 दिन। रत्न बिना ज्योतिषी की सलाह के न पहनें; पहले पंचमुखी रुद्राक्ष या चांदी की अंगूठी सरल विकल्प है।`;
+    const follow = {
+      career: 'क्या आप नौकरी बदलना चाहते हैं, व्यापार, या वर्तमान पद पर प्रमोशन?',
+      marriage: 'क्या आप विवाह की समय-सीमा जानना चाहते हैं, या कुंडली मिलान/दोष?',
+      health: 'क्या कोई विशेष अंग या तनाव है जिस पर विस्तार से पढ़ाई चाहिए?',
+      finance: 'क्या प्रश्न नौकरी की आय, संपत्ति, या कर्ज से जुड़ा है?',
+      education: 'किस परीक्षा या विषय में मार्गदर्शन चाहिए?',
+      travel: 'देश के भीतर यात्रा है या विदेश बसने का विचार?',
+      general: 'करियर, विवाह, स्वास्थ्य या धन — आगे किस विषय को विस्तार दें?',
+    };
+    return `🔮 ${openings[topic] || openings.general}\n\n${body2}\n\n${body3}\n\n${remedies}\n\n💫 ${follow[topic] || follow.general}`;
+  }
+
+  const openings = {
+    career: `On **career**, your chart does not point to a vague “good job” line — it shows a path. With **${lagna} Lagna** and **${sun} Sun**, the 10th house (Karma Bhava) is the seat of work, status and calling. **${dasha} Dasha** is running, so promotions, a switch, or a new field usually ripen in this cycle rather than overnight.`,
+    marriage: `On **marriage**, the 7th house, Venus and the Moon decide timing more than a lucky guess. Your **${moon} Moon** shows emotional readiness and **${lagna} Lagna** shows how you appear as a partner. The stars indicate a union that lasts when you do not rush the first promising match.`,
+    health: `On **health**, vitality is read from Lagna and the 6th house. **${sun} Sun** rules stamina; **${moon} Moon** rules sleep and the nervous system. During **${dasha} Dasha**, small daily discipline helps more than a single ritual.`,
+    finance: `On **money**, the 2nd house (savings) and 11th house (gains) matter together. **${sun} Sun** and **${dasha} Dasha** colour how income arrives — usually steady accumulation rather than a sudden jackpot.`,
+    education: `On **studies**, the 5th house and Mercury/Jupiter show intellect. **${nak} Nakshatra** describes how you learn. **${dasha} Dasha** can support exams, a course or a skill if you keep a fixed routine.`,
+    travel: `On **travel and abroad**, the 9th and 12th houses speak. With **${lagna} Lagna** and **${dasha} Dasha**, journeys for work or dharma tend to succeed more than impulsive trips.`,
+    general: `I have read your question with this Kundli: **${sun} Sun, ${moon} Moon, ${lagna} Lagna, ${nak} Nakshatra**, and **${dasha} Dasha**. That combination is the lens for the answer below.`,
+  };
+  const body2 = `Birth place **${place || 'the place you shared'}** is noted. Planetary sketch: ${planets}. Lagna **${lagna}** is how the world meets you; Moon **${moon}** is how you feel under pressure; Sun **${sun}** is purpose. Nakshatra **${nak}** shows whether you decide fast, slowly, or in repeating cycles. Use this map — do not ignore a weak house just because a YouTube clip named your Sun sign.`;
+  const body3 = `**Timing:** In ${dasha} Mahadasha, important results often appear in a 3–6 month window and settle over 12–18 months. When Jupiter or Venus transits Lagna or the house of the question, doors open more clearly. Avoid signing major papers only in a Rahu-Ketu rush. If you asked “soon”, the chart suggests movement in this dasha, not a promise of next week.`;
+  const remedies = `**Remedies (do these, do not only hear them):** 12 Surya Namaskar or morning sunlight on the face; Monday white daan (rice or milk) for the Moon; Saturday oil/grain daan if work feels blocked by Saturn. Mantras for 21 days, 108 times — career: “Om Suryaya Namah”; marriage: “Om Shum Shukraya Namah”; health: “Om Chandraya Namah”. Do not buy a gemstone from a shop push; a simple panchmukhi rudraksha or silver ring is safer until a skilled jyotishi checks your chart. Fasting on the weekday of the concerned planet (Sunday Sun, Monday Moon, Friday Venus) helps more than fear.`;
+  const follow = {
+    career: 'Shall I read job-change, business, or promotion in your current role next?',
+    marriage: 'Do you want timing of marriage, matching, or a specific dosha next?',
+    health: 'Is there a particular organ, sleep issue, or stress you want read in depth?',
+    finance: 'Is the question about salary, property, or debt?',
+    education: 'Which exam or subject should we open next?',
+    travel: 'Is this domestic travel or settling abroad?',
+    general: 'Which area should we open next — career, marriage, health, or money?',
+  };
+  return `🔮 ${openings[topic] || openings.general}\n\n${body2}\n\n${body3}\n\n${remedies}\n\n💫 ${follow[topic] || follow.general}`;
 }
 
 function fallbackResponse(session, userMessage, step) {
@@ -165,18 +227,7 @@ function fallbackResponse(session, userMessage, step) {
         : `🌑 **Amavasya** (New Moon) is ideal for Pitru Tarpan and spiritual cleansing.\n\nAvoid starting new ventures on Amavasya. Meditate, donate, and honor ancestors.\n\nDo you wish to know remedies for Pitru Dosha in your Kundli?`;
     }
 
-    const titles = {
-      hi: { marriage: 'विवाह', career: 'करियर', health: 'स्वास्थ्य', finance: 'वित्त', education: 'शिक्षा', travel: 'विदेश यात्रा', general: 'आपका प्रश्न' },
-      en: { marriage: 'marriage', career: 'career', health: 'health', finance: 'finance', education: 'education', travel: 'travel', general: 'your question' },
-    };
-    const title = titles[lang][topic] || titles[lang].general;
-    const prediction = k?.predictions?.[topic]
-      || (isHi
-        ? `आपने पूछा: "${userMessage}"\n\nआपकी ${k?.sunSign || ''} सूर्य, ${k?.moonSign || ''} चंद्र और ${k?.nakshatra || ''} नक्षत्र के आधार पर — ${k?.currentDasha || ''} दशा सक्रिय है।`
-        : `You asked: "${userMessage}"\n\nBased on your ${k?.sunSign} Sun, ${k?.moonSign} Moon, and ${k?.nakshatra} Nakshatra — ${k?.currentDasha} Dasha is active.`);
-    const followUp = isHi ? 'क्या आप उपाय या शुभ समय जानना चाहेंगे?' : 'Would you like remedies or auspicious timings?';
-    const header = isHi ? `**${title} के लिए पढ़ाई:**` : `**Reading for ${title}:**`;
-    return `🔮 ${header}\n\n${prediction}\n\n💫 ${followUp}`;
+    return detailedTopicReading(k, topic, userMessage, lang);
   }
 
   return lang === 'hi'
@@ -213,7 +264,7 @@ async function callGpt(session, userMessage, step) {
   const result = await openai.chat.completions.create({
     model: OPENAI_MODEL,
     temperature: 0.6,
-    max_tokens: 1200,
+    max_tokens: 2500,
     messages: [
       { role: 'system', content: buildSystemContext(session, step) },
       ...buildChatHistory(session, userMessage),
@@ -225,6 +276,7 @@ async function callGpt(session, userMessage, step) {
 
 export async function getAIResponse(session, userMessage, step) {
   if (!openai) {
+    console.warn('OPENAI_API_KEY is not set — using detailed template replies');
     return { content: fallbackResponse(session, userMessage, step), source: 'fallback' };
   }
   try {
@@ -247,7 +299,7 @@ export async function getQuickAnswer(question, kundli = null, language = 'hi') {
     const result = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       temperature: 0.6,
-      max_tokens: 1200,
+      max_tokens: 2500,
       messages: [
         { role: 'system', content: SYSTEM_PROMPTS[lang] },
         {
