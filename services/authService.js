@@ -4,8 +4,17 @@ import User from '../models/User.js';
 
 const client = new OAuth2Client();
 
+/** Dedicated Web OAuth client for meraastro.in (Android client stays on GOOGLE_CLIENT_ID_ANDROID). */
+export const GOOGLE_WEB_CLIENT_ID =
+  '1008877482736-nfvnfh0dba7rm9729hugbvtnimi04ms4.apps.googleusercontent.com';
+
+export function getWebClientId() {
+  return process.env.GOOGLE_CLIENT_ID_WEB_SITE || GOOGLE_WEB_CLIENT_ID;
+}
+
 function getAudience() {
   const ids = [
+    getWebClientId(),
     process.env.GOOGLE_CLIENT_ID_WEB,
     process.env.GOOGLE_CLIENT_ID_ANDROID,
     process.env.GOOGLE_CLIENT_ID_IOS,
@@ -14,7 +23,7 @@ function getAudience() {
   if (!ids.length) {
     throw new Error('No Google client IDs configured (GOOGLE_CLIENT_ID_WEB / ANDROID / IOS)');
   }
-  return ids;
+  return [...new Set(ids)];
 }
 
 function getJwtSecret() {

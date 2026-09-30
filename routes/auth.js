@@ -4,6 +4,7 @@ import {
   upsertGoogleUser,
   signToken,
   toPublicUser,
+  getWebClientId,
 } from '../services/authService.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getClientIp, logActivity } from '../services/activityService.js';
@@ -26,7 +27,7 @@ function normalizeCity(city) {
 
 router.get('/config', (_req, res) => {
   res.json({
-    googleClientId: process.env.GOOGLE_CLIENT_ID_WEB || '',
+    googleClientId: getWebClientId(),
   });
 });
 
