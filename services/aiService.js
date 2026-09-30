@@ -15,8 +15,8 @@ const openaiKey = (() => {
 })();
 
 const genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
-const GEMINI_MODEL = String(process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview').trim() || 'gemini-3.1-pro-preview';
-const GEMINI_FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash'];
+const GEMINI_MODEL = String(process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim() || 'gemini-3.8-flash';
+const GEMINI_FALLBACK_MODELS = ['gemini-3.1-pro-preview', 'gemini-3.5-flash'];
 
 const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim() || 'gpt-4o-mini';
