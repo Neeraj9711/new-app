@@ -100,6 +100,7 @@ router.post('/message', async (req, res) => {
       language: updatedSession.language,
       reply: aiResult.content,
       source: aiResult.source,
+      aiError: aiResult.error || null,
       kundli: nextStep === 'problem' || nextStep === 'consultation' ? kundli : null,
       birthDetails,
       messages: finalSession.messages,

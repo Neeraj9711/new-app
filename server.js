@@ -6,6 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { connectDB } from './db/connect.js';
+import { isGptEnabled, OPENAI_MODEL } from './services/aiService.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import chatRoutes from './routes/chat.js';
@@ -31,7 +32,12 @@ app.use(express.static(publicDir));
 
 // ——— Mobile + web API (unchanged paths) ———
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', app: 'Astro AI', version: '1.0.0' });
+  res.json({
+    status: 'ok',
+    app: 'Astro AI',
+    version: '1.0.0',
+    ai: isGptEnabled() ? 'gpt' : 'fallback',
+  });
 });
 
 app.get('/privacy', (_req, res) => {
@@ -110,8 +116,8 @@ if (fs.existsSync(clientDir)) {
   });
 }
 
-const aiMode = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'
-  ? `GPT (${process.env.OPENAI_MODEL || 'gpt-4o-mini'})`
+const aiMode = isGptEnabled()
+  ? `GPT (${OPENAI_MODEL})`
   : 'Fallback templates (set OPENAI_API_KEY for GPT replies)';
 
 async function start() {

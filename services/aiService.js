@@ -1,12 +1,18 @@
 import OpenAI from 'openai';
 import { formatKundliForAI } from './kundliService.js';
 
-const openaiKey = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'
-  ? process.env.OPENAI_API_KEY
-  : null;
+const openaiKey = (() => {
+  const raw = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!raw || raw === 'your_openai_api_key_here') return null;
+  return raw;
+})();
 
 const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim() || 'gpt-4o-mini';
+
+export function isGptEnabled() {
+  return Boolean(openai);
+}
 
 function resolveLang(language) {
   return language === 'en' ? 'en' : 'hi';
