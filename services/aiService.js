@@ -15,7 +15,8 @@ const openaiKey = (() => {
 })();
 
 const genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
-const GEMINI_MODEL = String(process.env.GEMINI_MODEL || 'gemini-1.5-pro').trim() || 'gemini-1.5-pro';
+const GEMINI_MODEL = String(process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview').trim() || 'gemini-3.1-pro-preview';
+const GEMINI_FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash'];
 
 const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim() || 'gpt-4o-mini';
@@ -287,19 +288,55 @@ function buildChatHistory(session, userMessage) {
   }));
 }
 
-async function callGemini(session, userMessage, step) {
-  const history = buildChatHistory(session, userMessage).map((msg) => ({
-    role: msg.role === 'user' ? 'user' : 'model',
-    parts: [{ text: msg.content }],
-  }));
-  const model = genAI.getGenerativeModel({
-    model: GEMINI_MODEL,
-    systemInstruction: buildSystemContext(session, step),
-    generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+function geminiModelsToTry() {
+  return [...new Set([GEMINI_MODEL, ...GEMINI_FALLBACK_MODELS].filter(Boolean))];
+}
+
+function extractGeminiText(data) {
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  return parts.map((part) => part.text).filter(Boolean).join('\n').trim();
+}
+
+async function callGeminiOnce(model, session, userMessage, step) {
+  const contents = [
+    ...buildChatHistory(session, userMessage).map((msg) => ({
+      role: msg.role === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.content }],
+    })),
+    { role: 'user', parts: [{ text: userMessage }] },
+  ];
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(geminiKey)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: buildSystemContext(session, step) }] },
+      contents,
+      generationConfig: { maxOutputTokens: 8192 },
+    }),
   });
-  const chat = model.startChat({ history });
-  const result = await chat.sendMessage(userMessage);
-  return result.response.text();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error?.message || `${model} HTTP ${res.status}`);
+  }
+  const text = extractGeminiText(data);
+  if (!text) {
+    throw new Error(`${model} returned no text (${data?.candidates?.[0]?.finishReason || 'empty'})`);
+  }
+  return text;
+}
+
+async function callGemini(session, userMessage, step) {
+  let lastError = null;
+  for (const model of geminiModelsToTry()) {
+    try {
+      return await callGeminiOnce(model, session, userMessage, step);
+    } catch (err) {
+      lastError = err;
+      console.error('Gemini error:', model, err.message);
+    }
+  }
+  throw lastError || new Error('Gemini request failed');
 }
 
 async function callGpt(session, userMessage, step) {
@@ -326,8 +363,7 @@ export async function getAIResponse(session, userMessage, step) {
       lastError = err.message;
       console.error('Gemini error:', err.message);
     }
-  }
-  if (openai) {
+  } else if (openai) {
     try {
       const content = (await callGpt(session, userMessage, step))?.trim();
       if (content) return { content, source: 'gpt' };
@@ -335,8 +371,7 @@ export async function getAIResponse(session, userMessage, step) {
       lastError = err.message;
       console.error('OpenAI error:', err.message);
     }
-  }
-  if (!genAI && !openai) {
+  } else {
     console.warn('No GEMINI_API_KEY or OPENAI_API_KEY — using detailed template replies');
   }
   return {
@@ -351,15 +386,8 @@ export async function getQuickAnswer(question, kundli = null, language = 'hi') {
   const session = { kundli, messages: [], language: lang };
   if (genAI) {
     try {
-      const model = genAI.getGenerativeModel({
-        model: GEMINI_MODEL,
-        systemInstruction: SYSTEM_PROMPTS[lang],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
-      });
-      const kundliContext = formatKundliForAI(kundli);
-      const result = await model.generateContent(`${kundliContext ? `${kundliContext}\n\n` : ''}User question: ${question}`);
-      const text = result.response.text();
-      if (text) return text;
+      const content = (await callGemini(session, question, 'consultation'))?.trim();
+      if (content) return content;
     } catch (err) {
       console.error('Gemini quick answer error:', err.message);
     }
