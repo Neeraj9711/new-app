@@ -1,10 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
 import LanguageToggle from './LanguageToggle';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Header() {
   const location = useLocation();
   const { t } = useLanguage();
+  const { user, logout } = useAuth();
   const isActive = (path) => {
     if (path === '/horoscope') {
       return location.pathname.startsWith('/horoscope') || location.pathname.startsWith('/rashifal')
@@ -32,6 +34,21 @@ export default function Header() {
         </nav>
         <div className="header-actions">
           <LanguageToggle />
+          {user ? (
+            <div className="auth-chip">
+              {user.photoUrl ? (
+                <img className="auth-avatar" src={user.photoUrl} alt="" referrerPolicy="no-referrer" />
+              ) : (
+                <span className="auth-avatar auth-avatar-fallback">{(user.name || user.email || '?').slice(0, 1)}</span>
+              )}
+              <span className="auth-name">{user.name || user.email}</span>
+              <button type="button" className="auth-signout" onClick={logout}>
+                {t('nav.signout')}
+              </button>
+            </div>
+          ) : (
+            <Link to="/login" className="auth-signin">{t('nav.signin')}</Link>
+          )}
           <Link to="/chat" className="header-cta">{t('nav.cta')}</Link>
         </div>
       </div>

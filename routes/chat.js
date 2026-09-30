@@ -4,13 +4,23 @@ import {
 } from '../services/sessionStore.js';
 import { generateKundli } from '../services/kundliService.js';
 import { getAIResponse } from '../services/aiService.js';
+import { optionalAuth } from '../middleware/auth.js';
+import { logActivity } from '../services/activityService.js';
 
 const router = Router();
 
-router.post('/session', async (req, res) => {
+router.post('/session', optionalAuth, async (req, res) => {
   try {
     const language = req.body?.language || 'hi';
     const session = await createSession(language);
+    if (req.user) {
+      await logActivity(req, {
+        user: req.user,
+        type: 'chat_start',
+        path: '/chat',
+        meta: { sessionId: session.id },
+      });
+    }
     res.json({
       sessionId: session.id,
       step: session.step,

@@ -54,15 +54,21 @@ export async function verifyGoogleIdToken(idToken) {
 }
 
 export function toPublicUser(user) {
+  const phone = user.phone || null;
+  const city = user.city || null;
   return {
     id: user._id.toString(),
     email: user.email,
     name: user.name,
     photoUrl: user.photoUrl,
-    phone: user.phone,
+    phone,
     phoneVerified: user.phoneVerified,
+    city,
     language: user.language,
-    needsPhone: !user.phone,
+    needsPhone: !phone,
+    needsProfile: !phone || !city,
+    loginCount: user.loginCount || 0,
+    lastLoginAt: user.lastLoginAt || null,
     createdAt: user.createdAt,
   };
 }
@@ -74,6 +80,7 @@ export async function upsertGoogleUser(googleProfile, language = 'hi') {
     $or: [{ googleId: googleProfile.googleId }, { email: googleProfile.email }],
   });
 
+  let isNew = false;
   if (user) {
     user.googleId = googleProfile.googleId;
     user.email = googleProfile.email;
@@ -82,6 +89,7 @@ export async function upsertGoogleUser(googleProfile, language = 'hi') {
     if (!user.language) user.language = lang;
     await user.save();
   } else {
+    isNew = true;
     user = await User.create({
       googleId: googleProfile.googleId,
       email: googleProfile.email,
@@ -91,5 +99,5 @@ export async function upsertGoogleUser(googleProfile, language = 'hi') {
     });
   }
 
-  return user;
+  return { user, isNew };
 }

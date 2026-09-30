@@ -35,6 +35,9 @@ export default function Seo() {
     upsertMeta('property', 'og:url', seo.canonical);
     upsertMeta('property', 'og:type', 'website');
     upsertLink('canonical', seo.canonical);
+
+    const robots = pathname === '/login' || pathname === '/admin' ? 'noindex, nofollow' : 'index, follow';
+    upsertMeta('name', 'robots', robots);
   }, [pathname]);
 
   return null;

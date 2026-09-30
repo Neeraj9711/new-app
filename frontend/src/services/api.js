@@ -1,18 +1,48 @@
 const PRODUCTION_API_URL = 'https://new-app-7cvj.onrender.com/api';
 
+export const AUTH_TOKEN_KEY = 'astro_token';
+
 function getBaseUrl() {
   // Same-origin /api when UI is served by the backend (Render).
   // Override with VITE_API_URL for local or split hosting.
   return import.meta.env.VITE_API_URL || (import.meta.env.DEV ? PRODUCTION_API_URL : '/api');
 }
 
+export function getAuthToken() {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token) {
+  try {
+    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
+    else localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 async function request(path, options = {}) {
+  const token = getAuthToken();
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   const res = await fetch(`${getBaseUrl()}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
+    headers,
   });
   if (!res.ok) {
-    const err = new Error(`API ${res.status}`);
+    let message = `API ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch {
+      /* ignore */
+    }
+    const err = new Error(message);
     err.status = res.status;
     throw err;
   }
@@ -47,4 +77,30 @@ export const kundliApi = {
       method: 'POST',
       body: JSON.stringify({ dateOfBirth, birthTime, birthPlace }),
     }),
+};
+
+export const authApi = {
+  config: () => request('/auth/config'),
+  google: (idToken, language) =>
+    request('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ idToken, language }),
+    }),
+  me: () => request('/auth/me'),
+  profile: (phone, city) =>
+    request('/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({ phone, city }),
+    }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  track: (type, path, meta = {}) =>
+    request('/auth/event', {
+      method: 'POST',
+      body: JSON.stringify({ type, path, meta }),
+    }).catch(() => null),
+};
+
+export const adminApi = {
+  users: (secret) => request('/admin/users', { headers: { 'x-admin-secret': secret } }),
+  activity: (secret) => request('/admin/activity', { headers: { 'x-admin-secret': secret } }),
 };

@@ -7,6 +7,9 @@ import ChatPage from './pages/ChatPage';
 import HoroscopePage from './pages/HoroscopePage';
 import PanchangPage from './pages/PanchangPage';
 import KundliPage from './pages/KundliPage';
+import LoginPage from './pages/LoginPage';
+import AdminPage from './pages/AdminPage';
+import { useAuth } from './context/AuthContext';
 
 function trackPage(pathname) {
   if (typeof window.gtag !== 'function') return;
@@ -15,10 +18,14 @@ function trackPage(pathname) {
 
 export default function App() {
   const { pathname } = useLocation();
+  const { user, track } = useAuth();
 
   useEffect(() => {
     trackPage(pathname);
-  }, [pathname]);
+    if (user && pathname !== '/login' && pathname !== '/admin') {
+      track('page', pathname);
+    }
+  }, [pathname, user, track]);
 
   return (
     <>
@@ -32,6 +39,8 @@ export default function App() {
           <Route path="/horoscope/:slug" element={<HoroscopePage />} />
           <Route path="/rashifal/:slug" element={<HoroscopePage />} />
           <Route path="/panchang" element={<PanchangPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Route>
       </Routes>
     </>

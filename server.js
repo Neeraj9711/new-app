@@ -7,6 +7,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { connectDB } from './db/connect.js';
 import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.js';
 import chatRoutes from './routes/chat.js';
 import kundliRoutes from './routes/kundli.js';
 import panchangRoutes from './routes/panchang.js';
@@ -38,6 +39,7 @@ app.get('/privacy', (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/kundli', kundliRoutes);
 app.use('/api/panchang', panchangRoutes);
@@ -80,7 +82,7 @@ function injectSeoHtml(html, pathname) {
 
 app.get('/robots.txt', (_req, res) => {
   res.type('text/plain').send(
-    `User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${SITE_ORIGIN}/sitemap.xml\n`,
+    `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /login\nSitemap: ${SITE_ORIGIN}/sitemap.xml\n`,
   );
 });
 
