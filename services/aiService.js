@@ -195,14 +195,23 @@ function fallbackResponse(session, userMessage, step) {
   }
 
   if (step === 'birthPlace' && k) {
-    const labels = lang === 'hi'
-      ? { sun: 'सूर्य राशि', moon: 'चंद्र राशि', lagna: 'लग्न', nakshatra: 'नक्षत्र', dasha: 'वर्तमान दशा' }
-      : { sun: 'Sun Sign', moon: 'Moon Sign', lagna: 'Lagna', nakshatra: 'Nakshatra', dasha: 'Current Dasha' };
-    const header = lang === 'hi' ? '✨ आपकी कुंडली तैयार हो गई!' : '✨ Your Kundli has been generated!';
-    const ask = lang === 'hi'
-      ? 'अब, कृपया **अपनी समस्या या प्रश्न** साझा करें। 🔮'
-      : 'Now, please share **your concern or question**. 🔮';
-    return `${header}\n\n• ${labels.sun}: ${k.sunSign}\n• ${labels.moon}: ${k.moonSign}\n• ${labels.lagna}: ${k.lagna}\n• ${labels.nakshatra}: ${k.nakshatra}\n• ${labels.dasha}: ${k.currentDasha}\n\n${k.summary}\n\n${ask}`;
+    const p = k.planets || {};
+    if (lang === 'hi') {
+      return `✨ आपकी कुंडली तैयार हो गई है — यह केवल एक राशि-सूची नहीं, एक पूरा नक्शा है।
+
+**${k.sunSign} सूर्य** आपके उद्देश्य और बाहरी पहचान को दिखाता है, **${k.moonSign} चंद्र** मन और प्रतिक्रिया को, **${k.lagna} लग्न** दुनिया आपको कैसे देखती है। **${k.nakshatra} नक्षत्र** निर्णय की गति बताता है और **${k.currentDasha} दशा** वर्तमान समय का स्वामी है। जन्म स्थान **${k.birthDetails?.birthPlace || ''}** दर्ज है।
+
+ग्रह स्थिति: सूर्य ${k.sunSign}, चंद्र ${k.moonSign}, मंगल ${p.Mars || '—'}, बुध ${p.Mercury || '—'}, गुरु ${p.Jupiter || '—'}, शुक्र ${p.Venus || '—'}, शनि ${p.Saturn || '—'}। ${k.summary} दशम भाव कर्म/करियर, सप्तम भाव विवाह, षष्ठ भाव स्वास्थ्य, द्वितीय-एकादश धन से जुड़े हैं — अगला प्रश्न इन्हीं घरों से पढ़ा जाएगा।
+
+अब विस्तार से पूछें: करियर, विवाह का समय, स्वास्थ्य, धन, संतान, या विदेश। जितना साफ प्रश्न होगा, पढ़ाई उतनी गहरी होगी। 🔮`;
+    }
+    return `✨ Your Kundli has been generated — this is a full map, not a one-line Sun-sign note.
+
+**${k.sunSign} Sun** shows purpose and outer identity. **${k.moonSign} Moon** shows mind, sleep and how you react under pressure. **${k.lagna} Lagna** is how the world meets you. **${k.nakshatra} Nakshatra** describes the pace of your decisions, and **${k.currentDasha} Dasha** is the time-lord running now. Birth place **${k.birthDetails?.birthPlace || ''}** is recorded.
+
+Planets in this chart: Sun ${k.sunSign}, Moon ${k.moonSign}, Mars ${p.Mars || '—'}, Mercury ${p.Mercury || '—'}, Jupiter ${p.Jupiter || '—'}, Venus ${p.Venus || '—'}, Saturn ${p.Saturn || '—'}. ${k.summary} The 10th house will be used for career, the 7th for marriage, the 6th for health, and the 2nd/11th for money — so the next question is read from those houses, not from a generic horoscope.
+
+Ask one clear question next: career path, marriage timing, health, finances, children, or travel abroad. The more specific the question, the deeper the reading. 🔮`;
   }
 
   if (step === 'problem' || step === 'consultation') {
