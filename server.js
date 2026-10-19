@@ -39,10 +39,10 @@ const CRAWLER_CACHE = 'public, max-age=3600, s-maxage=86400';
 
 function sendRobots(res) {
   res.status(200)
-    .set('Cache-Control', CRAWLER_CACHE)
+    .set('Cache-Control', 'no-store, no-cache, must-revalidate')
     .type('text/plain; charset=utf-8')
     .send(
-      `User-agent: *\nAllow: /sitemap.txt\nAllow: /sitemap.xml\nAllow: /pages.xml\nAllow: /robots.txt\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /login\n\nUser-agent: Googlebot\nAllow: /sitemap.txt\nAllow: /sitemap.xml\nAllow: /pages.xml\nAllow: /\n\nSitemap: ${SITE_ORIGIN}/sitemap.txt\nSitemap: ${SITE_ORIGIN}/sitemap.xml\nSitemap: ${SITE_ORIGIN}/pages.xml\n`,
+      `User-agent: *\nAllow: /\n\nUser-agent: Googlebot\nAllow: /\n\nUser-agent: Google-InspectionTool\nAllow: /\n\nSitemap: ${SITE_ORIGIN}/sitemap.txt\n`,
     );
 }
 

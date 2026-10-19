@@ -1,19 +1,10 @@
 User-agent: *
-Allow: /sitemap.txt
-Allow: /sitemap.xml
-Allow: /pages.xml
-Allow: /robots.txt
 Allow: /
-Disallow: /api/
-Disallow: /admin
-Disallow: /login
 
 User-agent: Googlebot
-Allow: /sitemap.txt
-Allow: /sitemap.xml
-Allow: /pages.xml
+Allow: /
+
+User-agent: Google-InspectionTool
 Allow: /
 
 Sitemap: https://meraastro.in/sitemap.txt
-Sitemap: https://meraastro.in/sitemap.xml
-Sitemap: https://meraastro.in/pages.xml
