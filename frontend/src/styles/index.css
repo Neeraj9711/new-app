@@ -1314,6 +1314,32 @@ input {
   }
 }
 
+.faq-list {
+  display: grid;
+  gap: 0.85rem;
+  max-width: 46rem;
+  margin: 0 auto;
+}
+
+.faq-item {
+  padding: 1.1rem 1.2rem;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.faq-item h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+}
+
+.faq-item p {
+  margin: 0;
+  color: var(--text-light);
+  line-height: 1.6;
+}
+
 .seo-intro {
   max-width: 46rem;
   margin: 0 0 1.25rem;

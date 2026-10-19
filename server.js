@@ -27,6 +27,14 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+app.use((req, res, next) => {
+  const host = String(req.headers.host || '').split(':')[0];
+  if (host === 'www.meraastro.in') {
+    return res.redirect(301, `https://meraastro.in${req.originalUrl}`);
+  }
+  next();
+});
+
 // Existing static pages (privacy, etc.) — unchanged for mobile/legal links
 app.use(express.static(publicDir));
 
@@ -60,7 +68,8 @@ function escapeHtml(value) {
 
 function injectSeoHtml(html, pathname) {
   const seo = getSeoForPath(pathname);
-  let out = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(seo.title)}</title>`);
+  let out = html.replace(/<html\s+lang="[^"]*"/, `<html lang="${escapeHtml(seo.lang || 'hi')}"`);
+  out = out.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(seo.title)}</title>`);
   if (out.includes('name="description"')) {
     out = out.replace(
       /<meta name="description" content="[^"]*"\s*\/?>/,
@@ -68,13 +77,30 @@ function injectSeoHtml(html, pathname) {
     );
   }
   out = out.replace(/<link rel="canonical"[^>]*>/g, '');
+  out = out.replace(/<link rel="alternate"[^>]*>/g, '');
   out = out.replace(/<meta property="og:[^"]+" content="[^"]*"\s*\/?>/g, '');
+  out = out.replace(/<meta name="twitter:[^"]+" content="[^"]*"\s*\/?>/g, '');
+  out = out.replace(/<meta name="robots" content="[^"]*"\s*\/?>/g, '');
+  out = out.replace(/<script type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/g, '');
+  const alternates = (seo.alternates || [])
+    .map((alt) => `<link rel="alternate" hreflang="${escapeHtml(alt.hreflang)}" href="${escapeHtml(alt.href)}" />`)
+    .join('\n    ');
   const extra = `
     <link rel="canonical" href="${escapeHtml(seo.canonical)}" />
+    ${alternates}
+    <meta name="robots" content="${escapeHtml(seo.robots || 'index, follow')}" />
     <meta property="og:title" content="${escapeHtml(seo.title)}" />
     <meta property="og:description" content="${escapeHtml(seo.description)}" />
     <meta property="og:url" content="${escapeHtml(seo.canonical)}" />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="${escapeHtml(seo.image)}" />
+    <meta property="og:locale" content="hi_IN" />
+    <meta property="og:site_name" content="Mera Astro AI" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${escapeHtml(seo.title)}" />
+    <meta name="twitter:description" content="${escapeHtml(seo.description)}" />
+    <meta name="twitter:image" content="${escapeHtml(seo.image)}" />
+    <script type="application/ld+json">${JSON.stringify(seo.jsonLd)}</script>
   `;
   out = out.replace('</head>', `${extra}</head>`);
   const prerender = `
@@ -111,6 +137,8 @@ if (fs.existsSync(clientDir)) {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
     fs.readFile(clientIndex, 'utf8', (err, html) => {
       if (err) return next(err);
+      const seo = getSeoForPath(req.path);
+      if (seo.notFound) res.status(404);
       res.type('html').send(injectSeoHtml(html, req.path));
     });
   });

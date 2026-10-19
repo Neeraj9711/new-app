@@ -13,14 +13,29 @@ function upsertMeta(attr, key, content) {
   el.setAttribute('content', content);
 }
 
-function upsertLink(rel, href) {
-  let el = document.head.querySelector(`link[rel="${rel}"]`);
+function upsertLink(rel, href, extra = {}) {
+  const selector = extra.hreflang
+    ? `link[rel="${rel}"][hreflang="${extra.hreflang}"]`
+    : `link[rel="${rel}"]:not([hreflang])`;
+  let el = document.head.querySelector(selector);
   if (!el) {
     el = document.createElement('link');
     el.setAttribute('rel', rel);
     document.head.appendChild(el);
   }
+  if (extra.hreflang) el.setAttribute('hreflang', extra.hreflang);
   el.setAttribute('href', href);
+}
+
+function upsertJsonLd(data) {
+  let el = document.getElementById('seo-jsonld');
+  if (!el) {
+    el = document.createElement('script');
+    el.id = 'seo-jsonld';
+    el.type = 'application/ld+json';
+    document.head.appendChild(el);
+  }
+  el.textContent = JSON.stringify(data);
 }
 
 export default function Seo() {
@@ -29,15 +44,26 @@ export default function Seo() {
   useEffect(() => {
     const seo = getSeoForPath(pathname);
     document.title = seo.title;
+    document.documentElement.lang = seo.lang || 'hi';
     upsertMeta('name', 'description', seo.description);
+    upsertMeta('name', 'robots', seo.robots || 'index, follow');
     upsertMeta('property', 'og:title', seo.title);
     upsertMeta('property', 'og:description', seo.description);
     upsertMeta('property', 'og:url', seo.canonical);
     upsertMeta('property', 'og:type', 'website');
+    upsertMeta('property', 'og:image', seo.image);
+    upsertMeta('property', 'og:locale', 'hi_IN');
+    upsertMeta('property', 'og:site_name', 'Mera Astro AI');
+    upsertMeta('name', 'twitter:card', 'summary_large_image');
+    upsertMeta('name', 'twitter:title', seo.title);
+    upsertMeta('name', 'twitter:description', seo.description);
+    upsertMeta('name', 'twitter:image', seo.image);
     upsertLink('canonical', seo.canonical);
-
-    const robots = pathname === '/login' || pathname === '/admin' ? 'noindex, nofollow' : 'index, follow';
-    upsertMeta('name', 'robots', robots);
+    document.head.querySelectorAll('link[rel="alternate"][hreflang]').forEach((node) => node.remove());
+    (seo.alternates || []).forEach((alt) => {
+      upsertLink('alternate', alt.href, { hreflang: alt.hreflang });
+    });
+    upsertJsonLd(seo.jsonLd);
   }, [pathname]);
 
   return null;

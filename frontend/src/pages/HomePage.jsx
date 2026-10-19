@@ -19,6 +19,7 @@ export default function HomePage() {
   const steps = t('home.steps');
   const testimonials = t('home.testimonials');
   const services = t('home.services');
+  const faqs = Array.isArray(t('home.faqs')) ? t('home.faqs') : [];
 
   return (
     <div className="home">
@@ -161,6 +162,20 @@ export default function HomePage() {
                     <span>{item.place}</span>
                   </div>
                 </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section faq-section">
+        <div className="container">
+          <h2 className="section-title">{t('home.faqTitle')}</h2>
+          <div className="faq-list">
+            {faqs.map((item) => (
+              <article key={item.q} className="faq-item">
+                <h3>{item.q}</h3>
+                <p>{item.a}</p>
               </article>
             ))}
           </div>

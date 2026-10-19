@@ -9,6 +9,7 @@ import PanchangPage from './pages/PanchangPage';
 import KundliPage from './pages/KundliPage';
 import LoginPage from './pages/LoginPage';
 import AdminPage from './pages/AdminPage';
+import ReelPage from './pages/ReelPage';
 import { useAuth } from './context/AuthContext';
 
 function trackPage(pathname) {
@@ -31,6 +32,7 @@ export default function App() {
     <>
       <Seo />
       <Routes>
+        <Route path="/reel" element={<ReelPage />} />
         <Route element={<Layout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/chat" element={<ChatPage />} />
