@@ -36,7 +36,13 @@ app.use((req, res, next) => {
 });
 
 // Existing static pages (privacy, etc.) — unchanged for mobile/legal links
-app.use(express.static(publicDir));
+app.use(express.static(publicDir, {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('sitemap.xml') || filePath.endsWith('robots.txt')) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+  },
+}));
 
 // ——— Mobile + web API (unchanged paths) ———
 app.get('/api/health', (req, res) => {
