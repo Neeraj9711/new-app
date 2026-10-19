@@ -38,8 +38,11 @@ app.use((req, res, next) => {
 // Existing static pages (privacy, etc.) — unchanged for mobile/legal links
 app.use(express.static(publicDir, {
   setHeaders(res, filePath) {
-    if (filePath.endsWith('sitemap.xml') || filePath.endsWith('robots.txt')) {
+    if (filePath.endsWith('.xml') || filePath.endsWith('robots.txt')) {
       res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+    if (filePath.endsWith('.xml')) {
+      res.setHeader('Content-Type', 'text/xml; charset=utf-8');
     }
   },
 }));

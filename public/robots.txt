@@ -4,4 +4,8 @@ Disallow: /api/
 Disallow: /admin
 Disallow: /login
 
+User-agent: Googlebot
+Allow: /
+
 Sitemap: https://meraastro.in/sitemap.xml
+Sitemap: https://meraastro.in/pages.xml
