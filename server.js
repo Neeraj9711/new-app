@@ -35,14 +35,51 @@ app.use((req, res, next) => {
   next();
 });
 
+const CRAWLER_CACHE = 'public, max-age=3600, s-maxage=86400';
+
+function sendRobots(res) {
+  res.status(200)
+    .set('Cache-Control', CRAWLER_CACHE)
+    .type('text/plain; charset=utf-8')
+    .send(
+      `User-agent: *\nAllow: /sitemap.txt\nAllow: /sitemap.xml\nAllow: /pages.xml\nAllow: /robots.txt\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /login\n\nUser-agent: Googlebot\nAllow: /sitemap.txt\nAllow: /sitemap.xml\nAllow: /pages.xml\nAllow: /\n\nSitemap: ${SITE_ORIGIN}/sitemap.txt\nSitemap: ${SITE_ORIGIN}/sitemap.xml\nSitemap: ${SITE_ORIGIN}/pages.xml\n`,
+    );
+}
+
+function sendSitemapXml(res) {
+  const urls = sitemapPaths().map((pagePath) => {
+    const loc = pagePath === '/' ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${pagePath}`;
+    return `<url><loc>${loc}</loc></url>`;
+  }).join('');
+  res.status(200)
+    .set('Cache-Control', CRAWLER_CACHE)
+    .type('application/xml; charset=utf-8')
+    .send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
+}
+
+function sendSitemapTxt(res) {
+  const body = sitemapPaths()
+    .map((pagePath) => (pagePath === '/' ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${pagePath}`))
+    .join('\n');
+  res.status(200)
+    .set('Cache-Control', CRAWLER_CACHE)
+    .type('text/plain; charset=utf-8')
+    .send(`${body}\n`);
+}
+
+// Crawler files first, before static/SPA, so Google never waits on Mongo or HTML.
+app.get('/robots.txt', (_req, res) => sendRobots(res));
+app.get(['/sitemap.xml', '/pages.xml'], (_req, res) => sendSitemapXml(res));
+app.get('/sitemap.txt', (_req, res) => sendSitemapTxt(res));
+
 // Existing static pages (privacy, etc.) — unchanged for mobile/legal links
 app.use(express.static(publicDir, {
   setHeaders(res, filePath) {
-    if (filePath.endsWith('.xml') || filePath.endsWith('robots.txt')) {
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+    if (filePath.endsWith('.xml') || filePath.endsWith('.txt') || filePath.endsWith('robots.txt')) {
+      res.setHeader('Cache-Control', CRAWLER_CACHE);
     }
     if (filePath.endsWith('.xml')) {
-      res.setHeader('Content-Type', 'text/xml; charset=utf-8');
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
     }
   },
 }));
@@ -121,33 +158,6 @@ function injectSeoHtml(html, pathname) {
   return out.replace('</body>', `${prerender}</body>`);
 }
 
-app.get('/robots.txt', (_req, res) => {
-  res.type('text/plain; charset=utf-8').send(
-    `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /login\n\nUser-agent: Googlebot\nAllow: /\n\nSitemap: ${SITE_ORIGIN}/sitemap.txt\nSitemap: ${SITE_ORIGIN}/sitemap.xml\nSitemap: ${SITE_ORIGIN}/pages.xml\n`,
-  );
-});
-
-function sendSitemapXml(res) {
-  const urls = sitemapPaths().map((pagePath) => {
-    const loc = pagePath === '/' ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${pagePath}`;
-    return `<url><loc>${loc}</loc></url>`;
-  }).join('');
-  res.status(200)
-    .type('text/xml; charset=utf-8')
-    .send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
-}
-
-app.get(['/sitemap.xml', '/pages.xml'], (_req, res) => {
-  sendSitemapXml(res);
-});
-
-app.get('/sitemap.txt', (_req, res) => {
-  const body = sitemapPaths()
-    .map((pagePath) => (pagePath === '/' ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${pagePath}`))
-    .join('\n');
-  res.status(200).type('text/plain; charset=utf-8').send(`${body}\n`);
-});
-
 // ——— Web UI only (does not handle /api/*) ———
 if (fs.existsSync(clientDir)) {
   app.use(express.static(clientDir, { index: false }));
@@ -170,21 +180,25 @@ const aiMode = provider === 'gemini'
     ? `GPT (${OPENAI_MODEL})`
     : 'Fallback templates (set GEMINI_API_KEY for Gemini Pro replies)';
 
-async function start() {
+async function connectDBWithRetry(attempt = 1) {
   try {
     await connectDB();
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🔮 Astro AI Backend running on http://localhost:${PORT}`);
-      console.log(`   Response mode: ${aiMode}`);
-      console.log(`   API (mobile + web): http://localhost:${PORT}/api`);
-      if (fs.existsSync(clientIndex)) {
-        console.log(`   Web UI: http://localhost:${PORT}/`);
-      }
-    });
   } catch (err) {
-    console.error('Failed to start server:', err.message);
-    process.exit(1);
+    console.error(`MongoDB connect failed (attempt ${attempt}):`, err.message);
+    setTimeout(() => connectDBWithRetry(attempt + 1), Math.min(30000, 3000 * attempt));
   }
+}
+
+async function start() {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🔮 Astro AI Backend running on http://localhost:${PORT}`);
+    console.log(`   Response mode: ${aiMode}`);
+    console.log(`   API (mobile + web): http://localhost:${PORT}/api`);
+    if (fs.existsSync(clientIndex)) {
+      console.log(`   Web UI: http://localhost:${PORT}/`);
+    }
+  });
+  await connectDBWithRetry();
 }
 
 start();

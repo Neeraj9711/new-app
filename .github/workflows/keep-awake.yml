@@ -1,0 +1,15 @@
+name: Keep site awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Warm sitemap and health for Googlebot
+        run: |
+          curl -fsS -L --max-time 60 -A "MeraAstroKeepAlive/1.0" -o /dev/null -w "sitemap.txt %{http_code}\n" https://meraastro.in/sitemap.txt
+          curl -fsS -L --max-time 60 -A "MeraAstroKeepAlive/1.0" -o /dev/null -w "health %{http_code}\n" https://meraastro.in/api/health
