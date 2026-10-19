@@ -122,21 +122,30 @@ function injectSeoHtml(html, pathname) {
 }
 
 app.get('/robots.txt', (_req, res) => {
-  res.type('text/plain').send(
-    `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /login\nSitemap: ${SITE_ORIGIN}/sitemap.xml\n`,
+  res.type('text/plain; charset=utf-8').send(
+    `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /login\n\nUser-agent: Googlebot\nAllow: /\n\nSitemap: ${SITE_ORIGIN}/sitemap.txt\nSitemap: ${SITE_ORIGIN}/sitemap.xml\nSitemap: ${SITE_ORIGIN}/pages.xml\n`,
   );
 });
 
-app.get('/sitemap.xml', (_req, res) => {
-  const lastmod = new Date().toISOString().split('T')[0];
-  const urls = sitemapPaths().map((path) => {
-    const loc = path === '/' ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${path}`;
-    const priority = path === '/' ? '1.0' : path.includes('rashifal') || path === '/kundli' || path === '/panchang' ? '0.9' : '0.7';
-    return `<url><loc>${loc}</loc><lastmod>${lastmod}</lastmod><changefreq>daily</changefreq><priority>${priority}</priority></url>`;
+function sendSitemapXml(res) {
+  const urls = sitemapPaths().map((pagePath) => {
+    const loc = pagePath === '/' ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${pagePath}`;
+    return `<url><loc>${loc}</loc></url>`;
   }).join('');
-  res.type('application/xml').send(
-    `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`,
-  );
+  res.status(200)
+    .type('text/xml; charset=utf-8')
+    .send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
+}
+
+app.get(['/sitemap.xml', '/pages.xml'], (_req, res) => {
+  sendSitemapXml(res);
+});
+
+app.get('/sitemap.txt', (_req, res) => {
+  const body = sitemapPaths()
+    .map((pagePath) => (pagePath === '/' ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${pagePath}`))
+    .join('\n');
+  res.status(200).type('text/plain; charset=utf-8').send(`${body}\n`);
 });
 
 // ——— Web UI only (does not handle /api/*) ———
@@ -144,6 +153,7 @@ if (fs.existsSync(clientDir)) {
   app.use(express.static(clientDir, { index: false }));
   app.get(/^(?!\/api).*/, (req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    if (/\.(xml|txt)$/i.test(req.path) || req.path === '/robots.txt') return next();
     fs.readFile(clientIndex, 'utf8', (err, html) => {
       if (err) return next(err);
       const seo = getSeoForPath(req.path);

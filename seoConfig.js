@@ -224,6 +224,7 @@ export function sitemapPaths() {
     '/chat',
     '/reel',
     '/privacy',
+    '/sitemap.html',
     ...ZODIAC_SEO.map((z) => `/rashifal/${z.slug}`),
   ];
 }

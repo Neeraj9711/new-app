@@ -30,6 +30,7 @@ export default function Footer() {
               <li><Link to="/panchang">{t('footer.amavasya')}</Link></li>
               <li><Link to="/chat">{t('footer.marriage')}</Link></li>
               <li><Link to="/chat">{t('footer.career')}</Link></li>
+              <li><a href="/sitemap.html">Sitemap</a></li>
             </ul>
           </div>
         </div>
