@@ -130,4 +130,14 @@ export const authApi = {
 export const adminApi = {
   users: (secret) => request('/admin/users', { headers: { 'x-admin-secret': secret } }),
   activity: (secret) => request('/admin/activity', { headers: { 'x-admin-secret': secret } }),
+  visitors: (secret) => request('/admin/visitors', { headers: { 'x-admin-secret': secret } }),
+};
+
+export const analyticsApi = {
+  visit: (visitorId, path, referrer = '') =>
+    request('/analytics/visit', {
+      method: 'POST',
+      body: JSON.stringify({ visitorId, path, referrer }),
+      timeoutMs: 8000,
+    }).catch(() => null),
 };

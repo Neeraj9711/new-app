@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import User from '../models/User.js';
 import Activity from '../models/Activity.js';
+import Visit from '../models/Visit.js';
 
 const router = Router();
 
@@ -68,6 +69,94 @@ router.get('/activity', async (_req, res) => {
   } catch (err) {
     console.error('Admin activity error:', err);
     res.status(500).json({ error: 'Failed to load activity' });
+  }
+});
+
+router.get('/visitors', async (_req, res) => {
+  try {
+    const [recentVisits, uniqueAgg, cityAgg, totalPageViews, uniqueCount] = await Promise.all([
+      Visit.find({})
+        .sort({ createdAt: -1 })
+        .limit(500)
+        .lean(),
+      Visit.aggregate([
+        { $sort: { createdAt: 1 } },
+        {
+          $group: {
+            _id: '$visitorId',
+            visits: { $sum: 1 },
+            lastSeen: { $max: '$createdAt' },
+            firstSeen: { $min: '$createdAt' },
+            city: { $last: '$city' },
+            state: { $last: '$state' },
+            country: { $last: '$country' },
+            ip: { $last: '$ip' },
+            lastPath: { $last: '$path' },
+          },
+        },
+        { $sort: { lastSeen: -1 } },
+        { $limit: 300 },
+      ]),
+      Visit.aggregate([
+        {
+          $group: {
+            _id: {
+              city: { $ifNull: ['$city', 'Unknown'] },
+              state: { $ifNull: ['$state', 'Unknown'] },
+              country: { $ifNull: ['$country', 'Unknown'] },
+            },
+            visits: { $sum: 1 },
+            visitors: { $addToSet: '$visitorId' },
+          },
+        },
+        {
+          $project: {
+            city: '$_id.city',
+            state: '$_id.state',
+            country: '$_id.country',
+            visits: 1,
+            uniqueVisitors: { $size: '$visitors' },
+            _id: 0,
+          },
+        },
+        { $sort: { visits: -1 } },
+        { $limit: 100 },
+      ]),
+      Visit.countDocuments(),
+      Visit.distinct('visitorId').then((ids) => ids.length),
+    ]);
+
+    res.json({
+      summary: {
+        totalPageViews,
+        uniqueVisitors: uniqueCount,
+      },
+      visitors: uniqueAgg.map((row) => ({
+        visitorId: row._id,
+        visits: row.visits,
+        city: row.city || '—',
+        state: row.state || '—',
+        country: row.country || '—',
+        ip: row.ip || '—',
+        lastPath: row.lastPath || '—',
+        firstSeen: row.firstSeen,
+        lastSeen: row.lastSeen,
+      })),
+      byLocation: cityAgg,
+      recent: recentVisits.map((item) => ({
+        id: item._id.toString(),
+        visitorId: item.visitorId,
+        path: item.path,
+        city: item.city || '—',
+        state: item.state || '—',
+        country: item.country || '—',
+        ip: item.ip || '—',
+        createdAt: item.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error('Admin visitors error:', err);
+    res.status(500).json({ error: 'Failed to load visitors' });
   }
 });
 

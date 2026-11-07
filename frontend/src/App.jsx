@@ -11,6 +11,8 @@ import LoginPage from './pages/LoginPage';
 import AdminPage from './pages/AdminPage';
 import ReelPage from './pages/ReelPage';
 import { useAuth } from './context/AuthContext';
+import { analyticsApi } from './services/api';
+import { getGuestId } from './utils/guestId';
 
 function trackPage(pathname) {
   if (typeof window.gtag !== 'function') return;
@@ -23,6 +25,9 @@ export default function App() {
 
   useEffect(() => {
     trackPage(pathname);
+    if (pathname !== '/admin') {
+      analyticsApi.visit(getGuestId(), pathname, document.referrer || '');
+    }
     if (user && pathname !== '/login' && pathname !== '/admin') {
       track('page', pathname);
     }
