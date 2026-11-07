@@ -15,8 +15,8 @@ const openaiKey = (() => {
 })();
 
 const genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
-const GEMINI_MODEL = String(process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim() || 'gemini-3.8-flash';
-const GEMINI_FALLBACK_MODELS = ['gemini-3.1-pro-preview', 'gemini-3.5-flash'];
+const GEMINI_MODEL = String(process.env.GEMINI_MODEL || 'gemini-2.0-flash').trim() || 'gemini-2.0-flash';
+const GEMINI_FALLBACK_MODELS = ['gemini-flash-latest'];
 
 const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim() || 'gpt-4o-mini';
@@ -31,51 +31,35 @@ function resolveLang(language) {
   return language === 'en' ? 'en' : 'hi';
 }
 
+const AI_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS || 18000);
+const AI_MAX_OUTPUT_TOKENS = Number(process.env.AI_MAX_OUTPUT_TOKENS || 900);
+// Collecting birth details should never wait on Gemini — instant templates only.
+const INSTANT_STEPS = new Set(['greeting', 'dob', 'birthTime']);
+
 const SYSTEM_PROMPTS = {
-  hi: `आप पंडित जी हैं, Astro AI ऐप पर एक बुद्धिमान और करुणामय वैदिक ज्योतिषी।
-आप हमेशा पूरी तरह से हिंदी (देवनागरी) में उत्तर दें। सम्मानजनक भाषा (आप) का प्रयोग करें।
-वैदिक शब्दावली स्वाभाविक रूप से प्रयोग करें (कुंडली, ग्रह, नक्षत्र, दोष, लग्न, दशा)।
+  hi: `आप पंडित जी हैं, Astro AI पर वैदिक ज्योतिषी। पूरा उत्तर हिंदी (देवनागरी) में दें।
+नियम: पहले सीधे प्रश्न का उत्तर दें; कुंडली का संक्षिप्त संदर्भ दें; 2–3 छोटे पैराग्राफ लिखें (लंबे निबंध नहीं); अंत में एक छोटा अनुवर्ती प्रश्न पूछें।`,
 
-नियम:
-- उपलब्ध होने पर उपयोगकर्ता की कुंडली विवरण का संदर्भ दें
-- विवाह, करियर, स्वास्थ्य, वित्त, संतान/पुत्र-कन्या और अन्य विषयों पर व्यक्तिगत मार्गदर्शन दें
-- हमेशा पहले उपयोगकर्ता के सटीक प्रश्न का उत्तर दें — सामान्य कुंडली सारांश से शुरुआत न करें
-- उत्तर 4 से 6 पूरे पैराग्राफ में लिखें। प्रत्येक पैराग्राफ 4–6 वाक्य का हो। एक-दो पंक्ति का उत्तर कभी न दें
-- पहले पैराग्राफ में सीधे प्रश्न का उत्तर, फिर भाव/ग्रह/दशा, फिर समय, फिर उपाय, अंत में एक अनुवर्ती प्रश्न
-- पंचांग प्रश्नों (एकादशी, अमावस्या) पर तिथियां और आध्यात्मिक महत्व बताएं
-- प्रोत्साहन दें पर ईमानदार रहें; ठोस उपाय (मंत्र, रत्न, उपवास, दान) विस्तार से सुझाएं
-- 100% निश्चितता का दावा न करें — "सितारे संकेत करते हैं", "आपकी कुंडली बताती है" जैसे वाक्य प्रयोग करें`,
-
-  en: `You are Pandit Ji, a wise and compassionate Vedic astrologer on the Astro AI app.
-You respond entirely in English. Use a warm, respectful tone.
-
-Rules:
-- Always reference the user's Kundli details when available (Sun sign, Moon sign, Lagna, Nakshatra, planetary positions)
-- Give specific, thoughtful predictions about marriage, career, health, finance, children/progeny, and any topic the user asks
-- ALWAYS answer the user's exact question first in the opening sentences — never open with a generic chart dump or a canned horoscope
-- Write 4 to 6 full paragraphs. Each paragraph must have 4–6 sentences. Never give a one-line or two-line reply
-- Structure: (1) direct answer, (2) houses, planets and dasha from THIS chart, (3) likely timing, (4) practical remedies in detail, (5) one follow-up question in the last paragraph
-- For Panchang questions (Ekadashi, Amavasya, Purnima), provide dates and spiritual significance
-- Be encouraging but honest. Mention remedies (mantras, gemstones, fasting, daan) with how and when to do them
-- Never claim 100% certainty — use phrases like "the stars indicate", "your chart suggests"`,
+  en: `You are Pandit Ji, a Vedic astrologer on Astro AI. Reply entirely in English.
+Rules: answer the user's question first; briefly reference this Kundli; write 2–3 short paragraphs (not essays); end with one short follow-up question.`,
 };
 
 const STEP_PROMPTS = {
   hi: {
-    greeting: 'उपयोगकर्ता का गर्मजोशी से स्वागत करें। अपना परिचय पंडित जी के रूप में दें और जन्म तिथि (DD/MM/YYYY) पूछें।',
-    dob: 'जन्म तिथि के लिए धन्यवाद। अब सटीक जन्म समय (जैसे 10:30 AM) पूछें। लग्न और भावों की गणना के लिए समय महत्वपूर्ण है।',
-    birthTime: 'जन्म समय नोट कर लिया। अब जन्म स्थान (शहर, राज्य/देश) पूछें।',
-    birthPlace: 'जन्म स्थान दर्ज हो गया और कुंडली तैयार है। 4 पूरे पैराग्राफ में कुंडली समझाएं (सूर्य, चंद्र, लग्न, नक्षत्र, दशा, ग्रह) फिर प्रश्न पूछें। एक सूची भर न दें।',
-    problem: 'उपयोगकर्ता अपनी समस्या या प्रश्न साझा कर रहा है। 4–6 पूरे पैराग्राफ में विस्तृत वैदिक पढ़ाई दें — सीधा उत्तर, कुंडली, समय, उपाय, फिर एक प्रश्न।',
-    consultation: 'परामर्श जारी रखें। नवीनतम प्रश्न का 4–6 पैराग्राफ में विस्तृत उत्तर दें। एक-पंक्ति जवाब मना है।',
+    greeting: 'गर्मजोशी से स्वागत करें और जन्म तिथि पूछें।',
+    dob: 'जन्म तिथि के लिए धन्यवाद। जन्म समय पूछें।',
+    birthTime: 'जन्म समय नोट करें। जन्म स्थान पूछें।',
+    birthPlace: 'कुंडली तैयार है। सूर्य/चंद्र/लग्न/नक्षत्र संक्षेप में बताएं और प्रश्न पूछें। 2–3 छोटे पैराग्राफ।',
+    problem: 'प्रश्न का सीधा उत्तर दें, कुंडली से 2–3 छोटे पैराग्राफ में।',
+    consultation: 'नवीनतम प्रश्न का संक्षिप्त पर स्पष्ट उत्तर दें। 2–3 छोटे पैराग्राफ।',
   },
   en: {
-    greeting: `Greet the user warmly as Pandit Ji from Astro AI. Introduce yourself briefly and ask for their Date of Birth (DD/MM/YYYY or any format). Make it feel personal and welcoming.`,
-    dob: `Thank them for sharing their date of birth. Now ask for their exact Birth Time (e.g., 10:30 AM). Explain that accurate time is important for Lagna and house calculations.`,
-    birthTime: `Acknowledge the birth time. Now ask for their Place of Birth (city, state/country). Explain this helps with timezone and geographic coordinates for the Kundli.`,
-    birthPlace: `The birth place is recorded and the Kundli is ready. Write 4 full paragraphs explaining this chart (Sun, Moon, Lagna, Nakshatra, Dasha, planets and what to ask next). Do not give a short bullet list.`,
-    problem: `The user is sharing their concern. Write a FULL consultation of 4–6 paragraphs: answer the exact question, explain houses/planets/dasha from this Kundli, give timing, give remedies, then one follow-up. Do not write a short template.`,
-    consultation: `Continue the consultation in 4–6 full paragraphs. Answer the latest question in depth using this Kundli. One-line answers are forbidden.`,
+    greeting: 'Greet warmly and ask for date of birth.',
+    dob: 'Thank them for DOB and ask for birth time.',
+    birthTime: 'Acknowledge birth time and ask for birth place.',
+    birthPlace: 'Kundli is ready. Briefly explain Sun/Moon/Lagna/Nakshatra and ask what to read next. 2–3 short paragraphs.',
+    problem: 'Answer the question directly using this Kundli in 2–3 short paragraphs.',
+    consultation: 'Answer the latest question clearly in 2–3 short paragraphs.',
   },
 };
 
@@ -297,6 +281,16 @@ function extractGeminiText(data) {
   return parts.map((part) => part.text).filter(Boolean).join('\n').trim();
 }
 
+function withTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    }),
+  ]);
+}
+
 async function callGeminiOnce(model, session, userMessage, step) {
   const contents = [
     ...buildChatHistory(session, userMessage).map((msg) => ({
@@ -306,29 +300,40 @@ async function callGeminiOnce(model, session, userMessage, step) {
     { role: 'user', parts: [{ text: userMessage }] },
   ];
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(geminiKey)}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: buildSystemContext(session, step) }] },
-      contents,
-      generationConfig: { maxOutputTokens: 8192 },
-    }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.error?.message || `${model} HTTP ${res.status}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: buildSystemContext(session, step) }] },
+        contents,
+        generationConfig: { maxOutputTokens: AI_MAX_OUTPUT_TOKENS, temperature: 0.7 },
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error?.message || `${model} HTTP ${res.status}`);
+    }
+    const text = extractGeminiText(data);
+    if (!text) {
+      throw new Error(`${model} returned no text (${data?.candidates?.[0]?.finishReason || 'empty'})`);
+    }
+    return text;
+  } finally {
+    clearTimeout(timer);
   }
-  const text = extractGeminiText(data);
-  if (!text) {
-    throw new Error(`${model} returned no text (${data?.candidates?.[0]?.finishReason || 'empty'})`);
-  }
-  return text;
 }
 
 async function callGemini(session, userMessage, step) {
   let lastError = null;
-  for (const model of geminiModelsToTry()) {
+  // Prefer the primary flash model only — avoid chaining slow Pro models that hang chat.
+  const models = [GEMINI_MODEL, 'gemini-2.0-flash', 'gemini-flash-latest'].filter(
+    (m, i, arr) => m && arr.indexOf(m) === i,
+  );
+  for (const model of models) {
     try {
       return await callGeminiOnce(model, session, userMessage, step);
     } catch (err) {
@@ -340,20 +345,32 @@ async function callGemini(session, userMessage, step) {
 }
 
 async function callGpt(session, userMessage, step) {
-  const result = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    temperature: 0.6,
-    max_tokens: 2500,
-    messages: [
-      { role: 'system', content: buildSystemContext(session, step) },
-      ...buildChatHistory(session, userMessage),
-      { role: 'user', content: userMessage },
-    ],
-  });
+  const result = await withTimeout(
+    openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      temperature: 0.6,
+      max_tokens: Math.min(AI_MAX_OUTPUT_TOKENS, 900),
+      messages: [
+        { role: 'system', content: buildSystemContext(session, step) },
+        ...buildChatHistory(session, userMessage),
+        { role: 'user', content: userMessage },
+      ],
+    }),
+    AI_TIMEOUT_MS,
+    'OpenAI',
+  );
   return result.choices?.[0]?.message?.content || '';
 }
 
 export async function getAIResponse(session, userMessage, step) {
+  // Birth-detail steps must reply instantly so the UI never sticks on "typing…"
+  if (INSTANT_STEPS.has(step)) {
+    return {
+      content: fallbackResponse(session, userMessage, step),
+      source: 'template',
+    };
+  }
+
   let lastError = null;
   if (genAI) {
     try {

@@ -30,32 +30,54 @@ async function request(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${getBaseUrl()}${path}`, {
-    ...options,
-    headers,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(data.error || `API ${res.status}`);
-    err.status = res.status;
-    err.code = data.code;
-    err.quota = data.quota;
-    err.data = data;
-    throw err;
+  const timeoutMs = options.timeoutMs ?? 45000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const { timeoutMs: _ignored, signal: userSignal, ...fetchOptions } = options;
+  if (userSignal) {
+    if (userSignal.aborted) controller.abort();
+    else userSignal.addEventListener('abort', () => controller.abort(), { once: true });
   }
-  return data;
+
+  try {
+    const res = await fetch(`${getBaseUrl()}${path}`, {
+      ...fetchOptions,
+      headers,
+      signal: controller.signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || `API ${res.status}`);
+      err.status = res.status;
+      err.code = data.code;
+      err.quota = data.quota;
+      err.data = data;
+      throw err;
+    }
+    return data;
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      const timeoutErr = new Error('Request timed out');
+      timeoutErr.code = 'TIMEOUT';
+      throw timeoutErr;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export const chatApi = {
   createSession: (language = 'en', guestId) =>
-    request('/chat/session', { method: 'POST', body: JSON.stringify({ language, guestId }) }),
+    request('/chat/session', { method: 'POST', body: JSON.stringify({ language, guestId }), timeoutMs: 30000 }),
   sendMessage: (sessionId, message, language = 'en', guestId) =>
     request('/chat/message', {
       method: 'POST',
       body: JSON.stringify({ sessionId, message, language, guestId }),
+      timeoutMs: 45000,
     }),
   resetSession: (id, language = 'en') =>
-    request(`/chat/reset/${id}`, { method: 'POST', body: JSON.stringify({ language }) }),
+    request(`/chat/reset/${id}`, { method: 'POST', body: JSON.stringify({ language }), timeoutMs: 30000 }),
 };
 
 export const billingApi = {
