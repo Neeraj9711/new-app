@@ -3,6 +3,8 @@ import { getGuestId } from './guestId';
 
 const GPS_CACHE_KEY = 'astro_gps_geo';
 
+let gpsRequestInFlight = null;
+
 function clientMeta() {
   let timezone = '';
   let language = '';
@@ -65,11 +67,11 @@ async function reverseGeocodeClient(latitude, longitude) {
   }
 }
 
-/**
- * Must be called from a user click (browsers block silent geolocation).
- */
+/** Request browser GPS automatically (native browser prompt only — no in-app choice). */
 export function requestPreciseLocation() {
-  return new Promise((resolve) => {
+  if (gpsRequestInFlight) return gpsRequestInFlight;
+
+  gpsRequestInFlight = new Promise((resolve) => {
     if (!navigator?.geolocation) {
       resolve(null);
       return;
@@ -91,31 +93,46 @@ export function requestPreciseLocation() {
       () => resolve(null),
       {
         enableHighAccuracy: false,
-        timeout: 12000,
+        timeout: 15000,
         maximumAge: 10 * 60 * 1000,
       },
     );
+  }).finally(() => {
+    gpsRequestInFlight = null;
   });
+
+  return gpsRequestInFlight;
 }
 
-/**
- * Track anonymous page visits. Uses cached GPS city when available.
- * On VPN, IP city is ignored by the server unless GPS city exists.
- */
-export function trackWebsiteVisit(pathname) {
-  if (!pathname || pathname.startsWith('/admin')) return;
-
+function postVisit(pathname, gps) {
   const visitorId = getGuestId();
   const referrer = typeof document !== 'undefined' ? (document.referrer || '') : '';
   const meta = clientMeta();
-  const gps = readCachedGps();
 
-  analyticsApi.visit(visitorId, pathname, referrer, {
+  return analyticsApi.visit(visitorId, pathname, referrer, {
     ...meta,
     latitude: gps?.latitude,
     longitude: gps?.longitude,
     city: gps?.city,
     state: gps?.state,
     country: gps?.country,
+  });
+}
+
+/**
+ * Track anonymous page visits and always try to capture GPS city by default.
+ */
+export function trackWebsiteVisit(pathname) {
+  if (!pathname || pathname.startsWith('/admin')) return;
+
+  const cached = readCachedGps();
+  postVisit(pathname, cached);
+
+  // Always request location unless we already have a city from GPS
+  if (cached?.city || cached?.state) return;
+
+  requestPreciseLocation().then((place) => {
+    if (!place) return;
+    postVisit(pathname, place);
   });
 }
