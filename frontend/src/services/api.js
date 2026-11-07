@@ -34,31 +34,36 @@ async function request(path, options = {}) {
     ...options,
     headers,
   });
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    let message = `API ${res.status}`;
-    try {
-      const body = await res.json();
-      if (body?.error) message = body.error;
-    } catch {
-      /* ignore */
-    }
-    const err = new Error(message);
+    const err = new Error(data.error || `API ${res.status}`);
     err.status = res.status;
+    err.code = data.code;
+    err.quota = data.quota;
+    err.data = data;
     throw err;
   }
-  return res.json();
+  return data;
 }
 
 export const chatApi = {
-  createSession: (language = 'en') =>
-    request('/chat/session', { method: 'POST', body: JSON.stringify({ language }) }),
-  sendMessage: (sessionId, message, language = 'en') =>
+  createSession: (language = 'en', guestId) =>
+    request('/chat/session', { method: 'POST', body: JSON.stringify({ language, guestId }) }),
+  sendMessage: (sessionId, message, language = 'en', guestId) =>
     request('/chat/message', {
       method: 'POST',
-      body: JSON.stringify({ sessionId, message, language }),
+      body: JSON.stringify({ sessionId, message, language, guestId }),
     }),
   resetSession: (id, language = 'en') =>
     request(`/chat/reset/${id}`, { method: 'POST', body: JSON.stringify({ language }) }),
+};
+
+export const billingApi = {
+  getQuota: (guestId) => request(`/billing/quota/${guestId}`),
+  createOrder: (guestId) =>
+    request('/billing/create-order', { method: 'POST', body: JSON.stringify({ guestId }) }),
+  verifyPayment: (payload) =>
+    request('/billing/verify', { method: 'POST', body: JSON.stringify(payload) }),
 };
 
 export const panchangApi = {

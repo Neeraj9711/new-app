@@ -6,12 +6,19 @@ import { generateKundli } from '../services/kundliService.js';
 import { getAIResponse } from '../services/aiService.js';
 import { optionalAuth } from '../middleware/auth.js';
 import { logActivity } from '../services/activityService.js';
+import {
+  assertCanSendPrompt,
+  consumePrompt,
+  getOrCreateQuota,
+  quotaPayload,
+} from '../services/billingService.js';
 
 const router = Router();
 
 router.post('/session', optionalAuth, async (req, res) => {
   try {
     const language = req.body?.language || 'hi';
+    const guestId = req.body?.guestId;
     const session = await createSession(language);
     if (req.user) {
       await logActivity(req, {
@@ -21,11 +28,17 @@ router.post('/session', optionalAuth, async (req, res) => {
         meta: { sessionId: session.id },
       });
     }
+    let quota = null;
+    if (guestId) {
+      const doc = await getOrCreateQuota(guestId);
+      quota = quotaPayload(doc);
+    }
     res.json({
       sessionId: session.id,
       step: session.step,
       language: session.language,
       messages: session.messages,
+      quota,
     });
   } catch (err) {
     console.error('Create session error:', err);
@@ -53,9 +66,26 @@ router.get('/session/:id', async (req, res) => {
 
 router.post('/message', async (req, res) => {
   try {
-    const { sessionId, message, language } = req.body;
+    const { sessionId, message, language, guestId } = req.body;
     if (!sessionId || !message) {
       return res.status(400).json({ error: 'sessionId and message are required' });
+    }
+
+    // Web freemium uses guestId. Mobile (no guestId yet) stays unrestricted until Play Billing.
+    let quotaStatus = null;
+    if (guestId) {
+      try {
+        ({ status: quotaStatus } = await assertCanSendPrompt(guestId));
+      } catch (err) {
+        if (err.code === 'PAYWALL') {
+          return res.status(402).json({
+            error: 'Free limit reached',
+            code: 'PAYWALL',
+            quota: err.quota,
+          });
+        }
+        throw err;
+      }
     }
 
     const session = await getSession(sessionId);
@@ -66,6 +96,9 @@ router.post('/message', async (req, res) => {
     }
 
     await addMessage(sessionId, 'user', message);
+    if (guestId) {
+      quotaStatus = await consumePrompt(guestId);
+    }
 
     let { step, birthDetails } = session;
     let kundli = session.kundli;
@@ -104,6 +137,7 @@ router.post('/message', async (req, res) => {
       kundli: nextStep === 'problem' || nextStep === 'consultation' ? kundli : null,
       birthDetails,
       messages: finalSession.messages,
+      quota: quotaStatus,
     });
   } catch (err) {
     console.error('Chat error:', err);
