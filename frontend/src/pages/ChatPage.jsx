@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { chatApi } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { getGuestId } from '../utils/guestId';
@@ -15,6 +16,7 @@ function formatDobForChat(isoDate) {
 
 export default function ChatPage() {
   const { language, t } = useLanguage();
+  const navigate = useNavigate();
   const guestId = useMemo(() => getGuestId(), []);
   const [details, setDetails] = useState(() => readChatDetails());
   const [sessionId, setSessionId] = useState(null);
@@ -150,7 +152,12 @@ export default function ChatPage() {
   };
 
   if (!details) {
-    return <ChatDetailsGate onComplete={(payload) => setDetails(payload)} />;
+    return (
+      <ChatDetailsGate
+        onComplete={(payload) => setDetails(payload)}
+        onClose={() => navigate('/')}
+      />
+    );
   }
 
   const quickPrompts = t('chat.quickPrompts');

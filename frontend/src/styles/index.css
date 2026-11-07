@@ -1746,7 +1746,30 @@ input {
 }
 
 .chat-details-modal {
+  position: relative;
   width: min(480px, 100%);
+}
+
+.chat-details-close {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-light, #666);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chat-details-close:hover {
+  background: var(--bg-alt, #f3f3f3);
+  color: var(--text, #222);
 }
 
 .chat-details-row {

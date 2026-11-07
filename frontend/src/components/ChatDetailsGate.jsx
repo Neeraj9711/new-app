@@ -27,7 +27,7 @@ function writeChatDetails(payload) {
   }
 }
 
-export default function ChatDetailsGate({ onComplete }) {
+export default function ChatDetailsGate({ onComplete, onClose }) {
   const { language, t } = useLanguage();
   const guestId = useMemo(() => getGuestId(), []);
   const existing = useMemo(() => readChatDetails(), []);
@@ -87,9 +87,35 @@ export default function ChatDetailsGate({ onComplete }) {
     }
   }
 
+  function handleBackdropClick(event) {
+    if (event.target !== event.currentTarget) return;
+    if (saving) return;
+    onClose?.();
+  }
+
   return (
-    <div className="profile-modal-backdrop chat-details-backdrop" role="dialog" aria-modal="true" aria-labelledby="chat-details-title">
-      <form className="profile-modal chat-details-modal" onSubmit={handleSubmit}>
+    <div
+      className="profile-modal-backdrop chat-details-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="chat-details-title"
+      onClick={handleBackdropClick}
+    >
+      <form
+        className="profile-modal chat-details-modal"
+        onSubmit={handleSubmit}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="chat-details-close"
+          onClick={onClose}
+          aria-label={t('chatDetails.close')}
+          disabled={saving}
+        >
+          ×
+        </button>
+
         <h2 id="chat-details-title">{t('chatDetails.title')}</h2>
         <p>{t('chatDetails.body')}</p>
 
