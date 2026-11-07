@@ -126,7 +126,22 @@ export async function reverseGeocode(lat, lon) {
   const longitude = Number(lon);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
 
-  // Open-Meteo reverse geocoding (no API key)
+  // BigDataCloud (reliable city names, no API key for non-commercial)
+  const bdc = await fetchJson(
+    `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
+    4000,
+  );
+  if (bdc && (bdc.city || bdc.locality || bdc.principalSubdivision)) {
+    return {
+      city: bdc.city || bdc.locality || null,
+      state: bdc.principalSubdivision || null,
+      country: bdc.countryName || null,
+      countryCode: bdc.countryCode || null,
+      source: 'gps',
+    };
+  }
+
+  // Open-Meteo fallback
   const data = await fetchJson(
     `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}&language=en&format=json`,
     4000,

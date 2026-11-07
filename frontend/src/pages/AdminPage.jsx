@@ -141,6 +141,7 @@ export default function AdminPage() {
                 <th>{t('auth.city')}</th>
                 <th>{t('auth.state')}</th>
                 <th>{t('auth.country')}</th>
+                <th>{t('auth.vpnExit')}</th>
                 <th>{t('auth.path')}</th>
                 <th>{t('auth.pageViews')}</th>
                 <th>IP</th>
@@ -155,6 +156,7 @@ export default function AdminPage() {
                   <td>{row.city}</td>
                   <td>{row.state}</td>
                   <td>{row.country}</td>
+                  <td>{row.vpnExitCity ? `${row.vpnExitCity}${row.vpnExitState ? `, ${row.vpnExitState}` : ''}` : '—'}</td>
                   <td>{row.lastPath}</td>
                   <td>{row.visits}</td>
                   <td>{row.ip}</td>
@@ -163,7 +165,7 @@ export default function AdminPage() {
                 </tr>
               ))}
               {loaded && visitors.length === 0 ? (
-                <tr><td colSpan={9}>{t('auth.noVisitorsYet')}</td></tr>
+                <tr><td colSpan={10}>{t('auth.noVisitorsYet')}</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -178,6 +180,7 @@ export default function AdminPage() {
                 <th>{t('auth.city')}</th>
                 <th>{t('auth.state')}</th>
                 <th>{t('auth.country')}</th>
+                <th>{t('auth.vpnExit')}</th>
                 <th>{t('auth.path')}</th>
                 <th>IP</th>
                 <th>{t('auth.isp')}</th>
@@ -191,6 +194,7 @@ export default function AdminPage() {
                   <td>{item.city}</td>
                   <td>{item.state}</td>
                   <td>{item.country}</td>
+                  <td>{item.vpnExitCity ? `${item.vpnExitCity}${item.vpnExitState ? `, ${item.vpnExitState}` : ''}` : '—'}</td>
                   <td>{item.path}</td>
                   <td>{item.ip}</td>
                   <td>{item.isProxy ? `${item.isp} (VPN)` : item.isp}</td>
@@ -198,7 +202,7 @@ export default function AdminPage() {
                 </tr>
               ))}
               {loaded && recentVisits.length === 0 ? (
-                <tr><td colSpan={8}>{t('auth.noVisitorsYet')}</td></tr>
+                <tr><td colSpan={9}>{t('auth.noVisitorsYet')}</td></tr>
               ) : null}
             </tbody>
           </table>

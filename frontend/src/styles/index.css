@@ -1826,6 +1826,58 @@ input {
   letter-spacing: 0.03em;
 }
 
+.loc-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin: 0;
+  padding: 0.7rem 1.25rem;
+  background: linear-gradient(90deg, #fff8e8, #fff);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.loc-banner p {
+  margin: 0;
+  flex: 1 1 16rem;
+  color: var(--text);
+}
+
+.loc-banner-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.loc-allow,
+.loc-dismiss {
+  width: auto;
+  margin: 0;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.loc-allow {
+  background: var(--saffron, #e67e22);
+  color: #fff;
+  border: none;
+}
+
+.loc-allow:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.loc-dismiss {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted, #666);
+}
+
 @media (max-width: 900px) {
   .auth-name {
     display: none;

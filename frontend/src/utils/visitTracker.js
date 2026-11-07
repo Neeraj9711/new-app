@@ -2,7 +2,6 @@ import { analyticsApi } from '../services/api';
 import { getGuestId } from './guestId';
 
 const GPS_CACHE_KEY = 'astro_gps_geo';
-const GPS_ASKED_KEY = 'astro_gps_asked';
 
 function clientMeta() {
   let timezone = '';
@@ -26,12 +25,12 @@ function clientMeta() {
   return { timezone, language, screen };
 }
 
-function readCachedGps() {
+export function readCachedGps() {
   try {
-    const raw = sessionStorage.getItem(GPS_CACHE_KEY);
+    const raw = localStorage.getItem(GPS_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (Number.isFinite(parsed?.latitude) && Number.isFinite(parsed?.longitude)) {
+    if (parsed?.city || parsed?.state || (Number.isFinite(parsed?.latitude) && Number.isFinite(parsed?.longitude))) {
       return parsed;
     }
   } catch {
@@ -40,64 +39,83 @@ function readCachedGps() {
   return null;
 }
 
-function writeCachedGps(coords) {
+function writeCachedGps(payload) {
   try {
-    sessionStorage.setItem(GPS_CACHE_KEY, JSON.stringify(coords));
+    localStorage.setItem(GPS_CACHE_KEY, JSON.stringify(payload));
   } catch {
     /* ignore */
   }
 }
 
-function requestBrowserGps() {
+async function reverseGeocodeClient(latitude, longitude) {
+  try {
+    const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      city: data.city || data.locality || data.localityInfo?.administrative?.[3]?.name || null,
+      state: data.principalSubdivision || null,
+      country: data.countryName || null,
+      latitude,
+      longitude,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Must be called from a user click (browsers block silent geolocation).
+ */
+export function requestPreciseLocation() {
   return new Promise((resolve) => {
     if (!navigator?.geolocation) {
       resolve(null);
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
+      async (pos) => {
+        const latitude = pos.coords.latitude;
+        const longitude = pos.coords.longitude;
+        const place = (await reverseGeocodeClient(latitude, longitude)) || {
+          latitude,
+          longitude,
+          city: null,
+          state: null,
+          country: null,
         };
-        writeCachedGps(coords);
-        resolve(coords);
+        writeCachedGps(place);
+        resolve(place);
       },
       () => resolve(null),
       {
         enableHighAccuracy: false,
-        timeout: 8000,
-        maximumAge: 30 * 60 * 1000,
+        timeout: 12000,
+        maximumAge: 10 * 60 * 1000,
       },
     );
   });
 }
 
 /**
- * Track anonymous (and logged-in) page visits for the admin portal.
- * Uses IP geo by default; upgrades to browser GPS city/state when permission is granted.
+ * Track anonymous page visits. Uses cached GPS city when available.
+ * On VPN, IP city is ignored by the server unless GPS city exists.
  */
-export async function trackWebsiteVisit(pathname) {
+export function trackWebsiteVisit(pathname) {
   if (!pathname || pathname.startsWith('/admin')) return;
 
   const visitorId = getGuestId();
   const referrer = typeof document !== 'undefined' ? (document.referrer || '') : '';
   const meta = clientMeta();
-
-  let gps = readCachedGps();
-  try {
-    const asked = sessionStorage.getItem(GPS_ASKED_KEY);
-    if (!gps && !asked) {
-      sessionStorage.setItem(GPS_ASKED_KEY, '1');
-      gps = await requestBrowserGps();
-    }
-  } catch {
-    /* ignore */
-  }
+  const gps = readCachedGps();
 
   analyticsApi.visit(visitorId, pathname, referrer, {
     ...meta,
     latitude: gps?.latitude,
     longitude: gps?.longitude,
+    city: gps?.city,
+    state: gps?.state,
+    country: gps?.country,
   });
 }

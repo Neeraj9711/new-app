@@ -9,6 +9,9 @@ const visitSchema = new mongoose.Schema(
     state: { type: String, default: null, index: true },
     country: { type: String, default: null },
     countryCode: { type: String, default: null },
+    // VPN/proxy exit location (not the visitor's real city)
+    vpnExitCity: { type: String, default: null },
+    vpnExitState: { type: String, default: null },
     isp: { type: String, default: null },
     org: { type: String, default: null },
     isProxy: { type: Boolean, default: false },
