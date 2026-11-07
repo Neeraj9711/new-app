@@ -11,6 +11,9 @@ const visitSchema = new mongoose.Schema(
     countryCode: { type: String, default: null },
     userAgent: { type: String, default: '' },
     referrer: { type: String, default: '' },
+    language: { type: String, default: null },
+    timezone: { type: String, default: null },
+    screen: { type: String, default: null },
   },
   { timestamps: true },
 );

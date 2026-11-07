@@ -171,8 +171,10 @@ export default function AdminPage() {
                 <th>{t('auth.when')}</th>
                 <th>{t('auth.city')}</th>
                 <th>{t('auth.state')}</th>
+                <th>{t('auth.country')}</th>
                 <th>{t('auth.path')}</th>
                 <th>IP</th>
+                <th>{t('auth.timezone')}</th>
               </tr>
             </thead>
             <tbody>
@@ -181,10 +183,15 @@ export default function AdminPage() {
                   <td>{formatWhen(item.createdAt)}</td>
                   <td>{item.city}</td>
                   <td>{item.state}</td>
+                  <td>{item.country}</td>
                   <td>{item.path}</td>
                   <td>{item.ip}</td>
+                  <td>{item.timezone || '—'}</td>
                 </tr>
               ))}
+              {loaded && recentVisits.length === 0 ? (
+                <tr><td colSpan={7}>{t('auth.noVisitorsYet')}</td></tr>
+              ) : null}
             </tbody>
           </table>
         </div>

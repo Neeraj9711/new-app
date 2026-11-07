@@ -11,8 +11,7 @@ import LoginPage from './pages/LoginPage';
 import AdminPage from './pages/AdminPage';
 import ReelPage from './pages/ReelPage';
 import { useAuth } from './context/AuthContext';
-import { analyticsApi } from './services/api';
-import { getGuestId } from './utils/guestId';
+import { trackWebsiteVisit } from './utils/visitTracker';
 
 function trackPage(pathname) {
   if (typeof window.gtag !== 'function') return;
@@ -23,11 +22,10 @@ export default function App() {
   const { pathname } = useLocation();
   const { user, track } = useAuth();
 
+  // Capture every website visit (no signup required) for admin geo reports
   useEffect(() => {
     trackPage(pathname);
-    if (pathname !== '/admin') {
-      analyticsApi.visit(getGuestId(), pathname, document.referrer || '');
-    }
+    trackWebsiteVisit(pathname);
     if (user && pathname !== '/login' && pathname !== '/admin') {
       track('page', pathname);
     }

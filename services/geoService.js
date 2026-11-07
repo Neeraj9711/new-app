@@ -18,6 +18,62 @@ export function normalizeIp(ip) {
   return String(ip).replace(/^::ffff:/, '').trim() || null;
 }
 
+async function fetchJson(url, timeoutMs = 3500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function lookupIpWhoIs(ip) {
+  const data = await fetchJson(`https://ipwho.is/${encodeURIComponent(ip)}`);
+  if (!data || data.success === false) return null;
+  return {
+    ip,
+    city: data.city || null,
+    state: data.region || data.region_code || null,
+    country: data.country || null,
+    countryCode: data.country_code || null,
+  };
+}
+
+async function lookupIpApiCom(ip) {
+  // Free endpoint is HTTP-only; fine from Render server-side.
+  const data = await fetchJson(
+    `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,message,country,countryCode,regionName,city,query`,
+  );
+  if (!data || data.status !== 'success') return null;
+  return {
+    ip: data.query || ip,
+    city: data.city || null,
+    state: data.regionName || null,
+    country: data.country || null,
+    countryCode: data.countryCode || null,
+  };
+}
+
+async function lookupIpApiCo(ip) {
+  const data = await fetchJson(`https://ipapi.co/${encodeURIComponent(ip)}/json/`);
+  if (!data || data.error) return null;
+  return {
+    ip,
+    city: data.city || null,
+    state: data.region || data.region_code || null,
+    country: data.country_name || null,
+    countryCode: data.country_code || null,
+  };
+}
+
 export async function lookupGeoByIp(ip) {
   const normalized = normalizeIp(ip);
   if (!normalized || isPrivateIp(normalized)) {
@@ -44,29 +100,11 @@ export async function lookupGeoByIp(ip) {
   };
 
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(
-      `https://ipapi.co/${encodeURIComponent(normalized)}/json/`,
-      { signal: controller.signal, headers: { Accept: 'application/json' } },
-    );
-    clearTimeout(timer);
-    if (!res.ok) {
-      cache.set(normalized, { at: Date.now(), data: empty });
-      return empty;
-    }
-    const data = await res.json();
-    if (data?.error) {
-      cache.set(normalized, { at: Date.now(), data: empty });
-      return empty;
-    }
-    const geo = {
-      ip: normalized,
-      city: data.city || null,
-      state: data.region || data.region_code || null,
-      country: data.country_name || null,
-      countryCode: data.country_code || null,
-    };
+    const geo =
+      (await lookupIpWhoIs(normalized))
+      || (await lookupIpApiCom(normalized))
+      || (await lookupIpApiCo(normalized))
+      || empty;
     cache.set(normalized, { at: Date.now(), data: geo });
     return geo;
   } catch (err) {

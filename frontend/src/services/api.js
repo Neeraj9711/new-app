@@ -134,10 +134,17 @@ export const adminApi = {
 };
 
 export const analyticsApi = {
-  visit: (visitorId, path, referrer = '') =>
+  visit: (visitorId, path, referrer = '', meta = {}) =>
     request('/analytics/visit', {
       method: 'POST',
-      body: JSON.stringify({ visitorId, path, referrer }),
-      timeoutMs: 8000,
+      body: JSON.stringify({
+        visitorId,
+        path,
+        referrer,
+        language: meta.language || '',
+        timezone: meta.timezone || '',
+        screen: meta.screen || '',
+      }),
+      timeoutMs: 10000,
     }).catch(() => null),
 };
