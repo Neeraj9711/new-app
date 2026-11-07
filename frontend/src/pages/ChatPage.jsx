@@ -21,7 +21,9 @@ export default function ChatPage() {
   const applyQuota = useCallback((next) => {
     if (!next) return;
     setQuota(next);
-    if (next.paywall) setShowPaywall(true);
+    // Only open paywall when freemium is enabled on the server
+    if (next.freemiumEnabled && next.paywall) setShowPaywall(true);
+    else setShowPaywall(false);
   }, []);
 
   const startNewSession = useCallback(async () => {
@@ -68,9 +70,10 @@ export default function ChatPage() {
     }
   };
 
+  const freemiumOn = Boolean(quota?.freemiumEnabled);
   const sendMessage = async (text) => {
     if (!text.trim() || loading) return;
-    if (quota?.paywall && !quota?.isSubscribed) {
+    if (freemiumOn && quota?.paywall && !quota?.isSubscribed) {
       setShowPaywall(true);
       return;
     }
@@ -109,7 +112,7 @@ export default function ChatPage() {
   };
 
   const quickPrompts = t('chat.quickPrompts');
-  const locked = Boolean(quota?.paywall && !quota?.isSubscribed);
+  const locked = Boolean(freemiumOn && quota?.paywall && !quota?.isSubscribed);
   const remainingLabel = quota?.isSubscribed
     ? t('chat.premiumActive')
     : t('chat.freeRemaining').replace('{{count}}', String(quota?.promptsRemaining ?? 5));
@@ -126,7 +129,7 @@ export default function ChatPage() {
             </div>
           </div>
           <div className="chat-header-actions">
-            {quota && (
+            {freemiumOn && quota && (
               <span className={`quota-pill ${quota.isSubscribed ? 'premium' : ''}`}>
                 {remainingLabel}
               </span>
@@ -189,15 +192,17 @@ export default function ChatPage() {
         )}
       </div>
 
-      <PaywallModal
-        guestId={guestId}
-        open={showPaywall}
-        onClose={() => setShowPaywall(false)}
-        onUnlocked={(nextQuota) => {
-          applyQuota(nextQuota);
-          setShowPaywall(false);
-        }}
-      />
+      {freemiumOn && (
+        <PaywallModal
+          guestId={guestId}
+          open={showPaywall}
+          onClose={() => setShowPaywall(false)}
+          onUnlocked={(nextQuota) => {
+            applyQuota(nextQuota);
+            setShowPaywall(false);
+          }}
+        />
+      )}
     </div>
   );
 }

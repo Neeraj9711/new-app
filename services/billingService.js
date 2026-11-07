@@ -3,6 +3,7 @@ import {
   FREE_PROMPT_LIMIT,
   PLAN_DURATION_DAYS,
   PLAN_PRICE_INR,
+  isFreemiumEnabled,
 } from '../constants/billing.js';
 
 function isActiveSubscription(quota) {
@@ -26,25 +27,31 @@ export async function getOrCreateQuota(guestId) {
 }
 
 export function quotaPayload(quota) {
+  const freemiumEnabled = isFreemiumEnabled();
   const subscribed = isActiveSubscription(quota);
   const used = quota.promptCount || 0;
   const remaining = subscribed ? null : Math.max(0, FREE_PROMPT_LIMIT - used);
   return {
     guestId: quota.guestId,
+    freemiumEnabled,
     freeLimit: FREE_PROMPT_LIMIT,
     promptsUsed: used,
-    promptsRemaining: remaining,
+    promptsRemaining: freemiumEnabled ? remaining : null,
     isSubscribed: subscribed,
     subscriptionExpiresAt: quota.subscriptionExpiresAt,
     planPriceInr: PLAN_PRICE_INR,
     planDurationDays: PLAN_DURATION_DAYS,
-    paywall: !subscribed && used >= FREE_PROMPT_LIMIT,
+    // Never show paywall while freemium is disabled
+    paywall: freemiumEnabled && !subscribed && used >= FREE_PROMPT_LIMIT,
   };
 }
 
 export async function assertCanSendPrompt(guestId) {
   const quota = await getOrCreateQuota(guestId);
   const status = quotaPayload(quota);
+  if (!isFreemiumEnabled()) {
+    return { quota, status };
+  }
   if (status.paywall) {
     const err = new Error('Free limit reached');
     err.code = 'PAYWALL';
@@ -57,6 +64,9 @@ export async function assertCanSendPrompt(guestId) {
 
 export async function consumePrompt(guestId) {
   const quota = await getOrCreateQuota(guestId);
+  if (!isFreemiumEnabled()) {
+    return quotaPayload(quota);
+  }
   if (isActiveSubscription(quota)) {
     return quotaPayload(quota);
   }

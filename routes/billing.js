@@ -6,7 +6,7 @@ import {
   quotaPayload,
   activateSubscription,
 } from '../services/billingService.js';
-import { PLAN_PRICE_INR, PLAN_NAME } from '../constants/billing.js';
+import { PLAN_PRICE_INR, PLAN_NAME, isFreemiumEnabled } from '../constants/billing.js';
 
 const router = Router();
 
@@ -28,6 +28,13 @@ router.get('/quota/:guestId', async (req, res) => {
 
 router.post('/create-order', async (req, res) => {
   try {
+    if (!isFreemiumEnabled()) {
+      return res.status(503).json({
+        error: 'Payments are temporarily disabled',
+        freemiumEnabled: false,
+      });
+    }
+
     const { guestId } = req.body || {};
     if (!guestId) return res.status(400).json({ error: 'guestId is required' });
 
@@ -73,6 +80,13 @@ router.post('/create-order', async (req, res) => {
 
 router.post('/verify', async (req, res) => {
   try {
+    if (!isFreemiumEnabled()) {
+      return res.status(503).json({
+        error: 'Payments are temporarily disabled',
+        freemiumEnabled: false,
+      });
+    }
+
     const {
       guestId,
       razorpay_order_id,
