@@ -35,22 +35,45 @@ async function fetchJson(url, timeoutMs = 3500) {
   }
 }
 
+function emptyGeo(ip) {
+  return {
+    ip,
+    city: null,
+    state: null,
+    country: null,
+    countryCode: null,
+    isp: null,
+    org: null,
+    isProxy: false,
+    isHosting: false,
+    source: 'ip',
+  };
+}
+
 async function lookupIpWhoIs(ip) {
   const data = await fetchJson(`https://ipwho.is/${encodeURIComponent(ip)}`);
   if (!data || data.success === false) return null;
+  const org = data.connection?.org || null;
+  const isp = data.connection?.isp || org;
+  const text = `${org || ''} ${isp || ''}`.toLowerCase();
+  const looksVpn = /vpn|proxy|hosting|m247|digitalocean|cloudflare|amazon|google|ovh|hetzner/.test(text);
   return {
     ip,
     city: data.city || null,
     state: data.region || data.region_code || null,
     country: data.country || null,
     countryCode: data.country_code || null,
+    isp,
+    org,
+    isProxy: looksVpn,
+    isHosting: looksVpn,
+    source: 'ip',
   };
 }
 
 async function lookupIpApiCom(ip) {
-  // Free endpoint is HTTP-only; fine from Render server-side.
   const data = await fetchJson(
-    `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,message,country,countryCode,regionName,city,query`,
+    `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,message,country,countryCode,regionName,city,isp,org,as,proxy,hosting,query`,
   );
   if (!data || data.status !== 'success') return null;
   return {
@@ -59,18 +82,11 @@ async function lookupIpApiCom(ip) {
     state: data.regionName || null,
     country: data.country || null,
     countryCode: data.countryCode || null,
-  };
-}
-
-async function lookupIpApiCo(ip) {
-  const data = await fetchJson(`https://ipapi.co/${encodeURIComponent(ip)}/json/`);
-  if (!data || data.error) return null;
-  return {
-    ip,
-    city: data.city || null,
-    state: data.region || data.region_code || null,
-    country: data.country_name || null,
-    countryCode: data.country_code || null,
+    isp: data.isp || null,
+    org: data.org || null,
+    isProxy: Boolean(data.proxy),
+    isHosting: Boolean(data.hosting),
+    source: 'ip',
   };
 }
 
@@ -78,11 +94,10 @@ export async function lookupGeoByIp(ip) {
   const normalized = normalizeIp(ip);
   if (!normalized || isPrivateIp(normalized)) {
     return {
-      ip: normalized,
+      ...emptyGeo(normalized),
       city: 'Local',
       state: 'Local',
       country: 'Local',
-      countryCode: null,
     };
   }
 
@@ -91,27 +106,40 @@ export async function lookupGeoByIp(ip) {
     return cached.data;
   }
 
-  const empty = {
-    ip: normalized,
-    city: null,
-    state: null,
-    country: null,
-    countryCode: null,
-  };
-
   try {
     const geo =
-      (await lookupIpWhoIs(normalized))
-      || (await lookupIpApiCom(normalized))
-      || (await lookupIpApiCo(normalized))
-      || empty;
+      (await lookupIpApiCom(normalized))
+      || (await lookupIpWhoIs(normalized))
+      || emptyGeo(normalized);
     cache.set(normalized, { at: Date.now(), data: geo });
     return geo;
   } catch (err) {
     console.error('Geo lookup failed:', err.message);
+    const empty = emptyGeo(normalized);
     cache.set(normalized, { at: Date.now(), data: empty });
     return empty;
   }
+}
+
+export async function reverseGeocode(lat, lon) {
+  const latitude = Number(lat);
+  const longitude = Number(lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  // Open-Meteo reverse geocoding (no API key)
+  const data = await fetchJson(
+    `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}&language=en&format=json`,
+    4000,
+  );
+  const place = data?.results?.[0];
+  if (!place) return null;
+  return {
+    city: place.name || place.admin2 || null,
+    state: place.admin1 || null,
+    country: place.country || null,
+    countryCode: place.country_code || null,
+    source: 'gps',
+  };
 }
 
 export async function resolveRequestGeo(req) {

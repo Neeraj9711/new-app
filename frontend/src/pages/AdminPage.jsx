@@ -130,6 +130,8 @@ export default function AdminPage() {
           </table>
         </div>
 
+        <p className="auth-hint">{t('auth.geoHint')}</p>
+
         <h3>{t('auth.visitorListHeading')}</h3>
         <div className="admin-table-wrap">
           <table className="admin-table">
@@ -142,6 +144,8 @@ export default function AdminPage() {
                 <th>{t('auth.path')}</th>
                 <th>{t('auth.pageViews')}</th>
                 <th>IP</th>
+                <th>{t('auth.isp')}</th>
+                <th>{t('auth.geoSource')}</th>
               </tr>
             </thead>
             <tbody>
@@ -154,10 +158,12 @@ export default function AdminPage() {
                   <td>{row.lastPath}</td>
                   <td>{row.visits}</td>
                   <td>{row.ip}</td>
+                  <td>{row.isProxy ? `${row.isp} (VPN)` : row.isp}</td>
+                  <td>{row.geoSource}</td>
                 </tr>
               ))}
               {loaded && visitors.length === 0 ? (
-                <tr><td colSpan={7}>{t('auth.noVisitorsYet')}</td></tr>
+                <tr><td colSpan={9}>{t('auth.noVisitorsYet')}</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -174,7 +180,8 @@ export default function AdminPage() {
                 <th>{t('auth.country')}</th>
                 <th>{t('auth.path')}</th>
                 <th>IP</th>
-                <th>{t('auth.timezone')}</th>
+                <th>{t('auth.isp')}</th>
+                <th>{t('auth.geoSource')}</th>
               </tr>
             </thead>
             <tbody>
@@ -186,11 +193,12 @@ export default function AdminPage() {
                   <td>{item.country}</td>
                   <td>{item.path}</td>
                   <td>{item.ip}</td>
-                  <td>{item.timezone || '—'}</td>
+                  <td>{item.isProxy ? `${item.isp} (VPN)` : item.isp}</td>
+                  <td>{item.geoSource}</td>
                 </tr>
               ))}
               {loaded && recentVisits.length === 0 ? (
-                <tr><td colSpan={7}>{t('auth.noVisitorsYet')}</td></tr>
+                <tr><td colSpan={8}>{t('auth.noVisitorsYet')}</td></tr>
               ) : null}
             </tbody>
           </table>

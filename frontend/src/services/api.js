@@ -144,7 +144,9 @@ export const analyticsApi = {
         language: meta.language || '',
         timezone: meta.timezone || '',
         screen: meta.screen || '',
+        latitude: meta.latitude ?? null,
+        longitude: meta.longitude ?? null,
       }),
-      timeoutMs: 10000,
+      timeoutMs: 12000,
     }).catch(() => null),
 };
