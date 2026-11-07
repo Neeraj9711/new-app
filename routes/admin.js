@@ -2,6 +2,7 @@ import { Router } from 'express';
 import User from '../models/User.js';
 import Activity from '../models/Activity.js';
 import Visit from '../models/Visit.js';
+import ChatLead from '../models/ChatLead.js';
 
 const router = Router();
 
@@ -174,6 +175,34 @@ router.get('/visitors', async (_req, res) => {
   } catch (err) {
     console.error('Admin visitors error:', err);
     res.status(500).json({ error: 'Failed to load visitors' });
+  }
+});
+
+router.get('/leads', async (_req, res) => {
+  try {
+    const leads = await ChatLead.find({})
+      .sort({ updatedAt: -1 })
+      .limit(500)
+      .lean();
+    res.json({
+      count: leads.length,
+      leads: leads.map((lead) => ({
+        id: lead._id.toString(),
+        guestId: lead.guestId,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        dateOfBirth: lead.dateOfBirth,
+        phone: lead.phone,
+        language: lead.language || '—',
+        sourcePath: lead.sourcePath || '/chat',
+        ip: lead.ip || '—',
+        createdAt: lead.createdAt,
+        updatedAt: lead.updatedAt,
+      })),
+    });
+  } catch (err) {
+    console.error('Admin leads error:', err);
+    res.status(500).json({ error: 'Failed to load chat leads' });
   }
 });
 

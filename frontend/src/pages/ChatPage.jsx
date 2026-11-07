@@ -3,10 +3,20 @@ import { chatApi } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { getGuestId } from '../utils/guestId';
 import PaywallModal from '../components/PaywallModal';
+import ChatDetailsGate, { readChatDetails } from '../components/ChatDetailsGate';
+
+function formatDobForChat(isoDate) {
+  if (!isoDate) return '';
+  // date input is YYYY-MM-DD → DD/MM/YYYY for pandit flow
+  const m = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  return isoDate;
+}
 
 export default function ChatPage() {
   const { language, t } = useLanguage();
   const guestId = useMemo(() => getGuestId(), []);
+  const [details, setDetails] = useState(() => readChatDetails());
   const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -21,12 +31,12 @@ export default function ChatPage() {
   const applyQuota = useCallback((next) => {
     if (!next) return;
     setQuota(next);
-    // Only open paywall when freemium is enabled on the server
     if (next.freemiumEnabled && next.paywall) setShowPaywall(true);
     else setShowPaywall(false);
   }, []);
 
   const startNewSession = useCallback(async () => {
+    if (!details) return;
     try {
       setInitializing(true);
       setKundli(null);
@@ -35,6 +45,19 @@ export default function ChatPage() {
       setMessages(data.messages || []);
       applyQuota(data.quota);
       lastLanguageRef.current = language;
+
+      // Seed DOB from the intake form so chat does not ask again
+      const dobText = formatDobForChat(details.dateOfBirth);
+      if (dobText && data.sessionId) {
+        try {
+          const seeded = await chatApi.sendMessage(data.sessionId, dobText, language, guestId);
+          setMessages(seeded.messages || []);
+          if (seeded.kundli) setKundli(seeded.kundli);
+          applyQuota(seeded.quota);
+        } catch {
+          /* keep greeting; user can type DOB */
+        }
+      }
     } catch {
       setMessages([{
         role: 'assistant',
@@ -44,13 +67,17 @@ export default function ChatPage() {
     } finally {
       setInitializing(false);
     }
-  }, [language, t, guestId, applyQuota]);
+  }, [language, t, guestId, applyQuota, details]);
 
   useEffect(() => {
+    if (!details) {
+      setInitializing(false);
+      return;
+    }
     if (!sessionId || lastLanguageRef.current !== language) {
       startNewSession();
     }
-  }, [sessionId, language, startNewSession]);
+  }, [details, sessionId, language, startNewSession]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -65,6 +92,17 @@ export default function ChatPage() {
       const data = await chatApi.resetSession(sessionId, language);
       setMessages(data.messages || []);
       lastLanguageRef.current = language;
+      const dobText = formatDobForChat(details?.dateOfBirth);
+      if (dobText) {
+        try {
+          const seeded = await chatApi.sendMessage(sessionId, dobText, language, guestId);
+          setMessages(seeded.messages || []);
+          if (seeded.kundli) setKundli(seeded.kundli);
+          applyQuota(seeded.quota);
+        } catch {
+          /* ignore */
+        }
+      }
     } catch {
       startNewSession();
     }
@@ -72,7 +110,7 @@ export default function ChatPage() {
 
   const freemiumOn = Boolean(quota?.freemiumEnabled);
   const sendMessage = async (text) => {
-    if (!text.trim() || loading) return;
+    if (!text.trim() || loading || !details) return;
     if (freemiumOn && quota?.paywall && !quota?.isSubscribed) {
       setShowPaywall(true);
       return;
@@ -110,6 +148,10 @@ export default function ChatPage() {
     e.preventDefault();
     sendMessage(input);
   };
+
+  if (!details) {
+    return <ChatDetailsGate onComplete={(payload) => setDetails(payload)} />;
+  }
 
   const quickPrompts = t('chat.quickPrompts');
   const locked = Boolean(freemiumOn && quota?.paywall && !quota?.isSubscribed);

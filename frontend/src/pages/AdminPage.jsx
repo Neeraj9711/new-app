@@ -27,6 +27,7 @@ export default function AdminPage() {
   const [visitors, setVisitors] = useState([]);
   const [byLocation, setByLocation] = useState([]);
   const [recentVisits, setRecentVisits] = useState([]);
+  const [leads, setLeads] = useState([]);
   const [summary, setSummary] = useState({ totalPageViews: 0, uniqueVisitors: 0 });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,16 +43,18 @@ export default function AdminPage() {
     setLoading(true);
     try {
       sessionStorage.setItem(SECRET_KEY, secret);
-      const [userData, activityData, visitorData] = await Promise.all([
+      const [userData, activityData, visitorData, leadData] = await Promise.all([
         adminApi.users(secret),
         adminApi.activity(secret),
         adminApi.visitors(secret),
+        adminApi.leads(secret),
       ]);
       setUsers(userData.users || []);
       setActivity(activityData.activity || []);
       setVisitors(visitorData.visitors || []);
       setByLocation(visitorData.byLocation || []);
       setRecentVisits(visitorData.recent || []);
+      setLeads(leadData.leads || []);
       setSummary(visitorData.summary || { totalPageViews: 0, uniqueVisitors: 0 });
       setLoaded(true);
     } catch (err) {
@@ -60,6 +63,7 @@ export default function AdminPage() {
       setVisitors([]);
       setByLocation([]);
       setRecentVisits([]);
+      setLeads([]);
       setLoaded(false);
       setError(err.message || t('auth.adminFailed'));
     } finally {
@@ -86,6 +90,40 @@ export default function AdminPage() {
           </button>
         </form>
         {error ? <p className="auth-error">{error}</p> : null}
+
+        <h2>{t('auth.leadsHeading')} ({loaded ? leads.length : t('auth.adminNotLoaded')})</h2>
+        <p className="auth-hint">{t('auth.leadsHint')}</p>
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>{t('auth.when')}</th>
+                <th>{t('auth.firstName')}</th>
+                <th>{t('auth.lastName')}</th>
+                <th>{t('auth.dob')}</th>
+                <th>{t('auth.phone')}</th>
+                <th>{t('auth.path')}</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map((lead) => (
+                <tr key={lead.id}>
+                  <td>{formatWhen(lead.updatedAt || lead.createdAt)}</td>
+                  <td>{lead.firstName}</td>
+                  <td>{lead.lastName}</td>
+                  <td>{lead.dateOfBirth}</td>
+                  <td>{lead.phone}</td>
+                  <td>{lead.sourcePath}</td>
+                  <td>{lead.ip}</td>
+                </tr>
+              ))}
+              {loaded && leads.length === 0 ? (
+                <tr><td colSpan={7}>{t('auth.noLeadsYet')}</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
 
         <h2>{t('auth.visitorsHeading')} ({loaded ? summary.uniqueVisitors : t('auth.adminNotLoaded')})</h2>
         {loaded ? (

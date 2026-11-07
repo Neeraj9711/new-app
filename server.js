@@ -15,6 +15,7 @@ import panchangRoutes from './routes/panchang.js';
 import horoscopeRoutes from './routes/horoscope.js';
 import billingRoutes from './routes/billing.js';
 import analyticsRoutes from './routes/analytics.js';
+import leadsRoutes from './routes/leads.js';
 import { SITE_ORIGIN, getSeoForPath, sitemapPaths } from './seoConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -107,6 +108,7 @@ app.use('/api/kundli', kundliRoutes);
 app.use('/api/panchang', panchangRoutes);
 app.use('/api/horoscope', horoscopeRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/leads', leadsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
 function escapeHtml(value) {

@@ -131,6 +131,16 @@ export const adminApi = {
   users: (secret) => request('/admin/users', { headers: { 'x-admin-secret': secret } }),
   activity: (secret) => request('/admin/activity', { headers: { 'x-admin-secret': secret } }),
   visitors: (secret) => request('/admin/visitors', { headers: { 'x-admin-secret': secret } }),
+  leads: (secret) => request('/admin/leads', { headers: { 'x-admin-secret': secret } }),
+};
+
+export const leadsApi = {
+  saveChatDetails: (payload) =>
+    request('/leads/chat-details', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      timeoutMs: 20000,
+    }),
 };
 
 export const analyticsApi = {

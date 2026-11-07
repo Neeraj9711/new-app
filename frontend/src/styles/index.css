@@ -1745,6 +1745,22 @@ input {
   font-weight: 600;
 }
 
+.chat-details-modal {
+  width: min(480px, 100%);
+}
+
+.chat-details-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 520px) {
+  .chat-details-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .admin-stats {
   display: flex;
   flex-wrap: wrap;
