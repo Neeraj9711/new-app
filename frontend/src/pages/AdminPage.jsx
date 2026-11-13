@@ -32,6 +32,8 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [fixingGeo, setFixingGeo] = useState(false);
+  const [fixGeoMsg, setFixGeoMsg] = useState('');
 
   async function load(event) {
     event?.preventDefault();
@@ -90,6 +92,37 @@ export default function AdminPage() {
           </button>
         </form>
         {error ? <p className="auth-error">{error}</p> : null}
+
+        {loaded ? (
+          <div className="admin-fix-geo">
+            <button
+              type="button"
+              className="admin-fix-geo-btn"
+              disabled={fixingGeo}
+              onClick={async () => {
+                setFixGeoMsg('');
+                setFixingGeo(true);
+                try {
+                  const result = await adminApi.fixGeo(secret);
+                  setFixGeoMsg(
+                    t('auth.fixGeoDone')
+                      .replace('{{updated}}', String(result.updated ?? 0))
+                      .replace('{{scanned}}', String(result.scanned ?? 0)),
+                  );
+                  await load();
+                } catch (err) {
+                  setFixGeoMsg(err.message || t('auth.fixGeoFailed'));
+                } finally {
+                  setFixingGeo(false);
+                }
+              }}
+            >
+              {fixingGeo ? t('auth.fixGeoWorking') : t('auth.fixGeo')}
+            </button>
+            <p className="auth-hint">{t('auth.fixGeoHint')}</p>
+            {fixGeoMsg ? <p className="auth-hint">{fixGeoMsg}</p> : null}
+          </div>
+        ) : null}
 
         <h2>{t('auth.leadsHeading')} ({loaded ? leads.length : t('auth.adminNotLoaded')})</h2>
         <p className="auth-hint">{t('auth.leadsHint')}</p>

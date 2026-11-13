@@ -3,6 +3,8 @@ import User from '../models/User.js';
 import Activity from '../models/Activity.js';
 import Visit from '../models/Visit.js';
 import ChatLead from '../models/ChatLead.js';
+import { cleanPlaceName } from '../services/geoPlace.js';
+import { lookupGeoByIp } from '../services/geoService.js';
 
 const router = Router();
 
@@ -175,6 +177,98 @@ router.get('/visitors', async (_req, res) => {
   } catch (err) {
     console.error('Admin visitors error:', err);
     res.status(500).json({ error: 'Failed to load visitors' });
+  }
+});
+
+/**
+ * One-time / on-demand: rewrite junk GPS cities (e.g. Atlantic Ocean)
+ * using IP geolocation for those visit rows.
+ */
+router.post('/fix-geo', async (_req, res) => {
+  try {
+    const badCityRe = /ocean|sea|atlantic|pacific|arctic|antarctic|unknown|null|undefined/i;
+    const candidates = await Visit.find({
+      $or: [
+        { city: badCityRe },
+        { state: badCityRe },
+        { city: null, geoSource: 'gps' },
+        { city: { $in: ['', '—', '-', 'Unknown', 'Atlantic Ocean'] } },
+      ],
+      ip: { $nin: [null, '', '—'] },
+    })
+      .select('_id ip city state country countryCode geoSource isProxy isHosting')
+      .limit(2000)
+      .lean();
+
+    const byIp = new Map();
+    for (const row of candidates) {
+      const ip = String(row.ip || '').trim();
+      if (!ip || ip === '—') continue;
+      // Keep rows that already have a valid city
+      if (cleanPlaceName(row.city)) continue;
+      if (!byIp.has(ip)) byIp.set(ip, []);
+      byIp.get(ip).push(row._id);
+    }
+
+    let updated = 0;
+    let skipped = 0;
+    const samples = [];
+
+    for (const [ip, ids] of byIp) {
+      const geo = await lookupGeoByIp(ip);
+      const city = cleanPlaceName(geo.city);
+      const state = cleanPlaceName(geo.state);
+      if (!city && !state) {
+        skipped += ids.length;
+        continue;
+      }
+
+      const vpnLike = Boolean(geo.isProxy || geo.isHosting);
+      const setDoc = {
+        city: city || null,
+        state: state || null,
+        country: geo.country || null,
+        countryCode: geo.countryCode || null,
+        isp: geo.isp || null,
+        org: geo.org || null,
+        isProxy: vpnLike,
+        isHosting: Boolean(geo.isHosting),
+        geoSource: 'ip',
+      };
+      if (vpnLike) {
+        setDoc.vpnExitCity = city;
+        setDoc.vpnExitState = state;
+        // For VPN exits keep visitor city unknown (same rule as live tracker)
+        setDoc.city = null;
+        setDoc.state = null;
+        setDoc.geoSource = 'unknown';
+      }
+
+      const result = await Visit.updateMany({ _id: { $in: ids } }, { $set: setDoc });
+      updated += result.modifiedCount || 0;
+      if (samples.length < 8) {
+        samples.push({
+          ip,
+          fromCount: ids.length,
+          city: setDoc.city,
+          state: setDoc.state,
+          vpnExitCity: setDoc.vpnExitCity || null,
+          country: setDoc.country,
+        });
+      }
+    }
+
+    res.json({
+      ok: true,
+      scanned: candidates.length,
+      uniqueIps: byIp.size,
+      updated,
+      skipped,
+      samples,
+    });
+  } catch (err) {
+    console.error('Admin fix-geo error:', err);
+    res.status(500).json({ error: 'Failed to fix visitor locations' });
   }
 });
 

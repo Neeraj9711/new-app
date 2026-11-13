@@ -132,6 +132,12 @@ export const adminApi = {
   activity: (secret) => request('/admin/activity', { headers: { 'x-admin-secret': secret } }),
   visitors: (secret) => request('/admin/visitors', { headers: { 'x-admin-secret': secret } }),
   leads: (secret) => request('/admin/leads', { headers: { 'x-admin-secret': secret } }),
+  fixGeo: (secret) =>
+    request('/admin/fix-geo', {
+      method: 'POST',
+      headers: { 'x-admin-secret': secret },
+      timeoutMs: 120000,
+    }),
 };
 
 export const leadsApi = {

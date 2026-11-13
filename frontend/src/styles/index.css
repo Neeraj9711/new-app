@@ -1816,6 +1816,27 @@ input {
   font-size: 1.05rem;
 }
 
+.admin-fix-geo {
+  margin: 0 0 1.5rem;
+}
+
+.admin-fix-geo-btn {
+  width: auto;
+  margin: 0;
+  padding: 0.65rem 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--secondary, #c45c26);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-fix-geo-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
 .admin-secret {
   display: flex;
   gap: 0.6rem;
