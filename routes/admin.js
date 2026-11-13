@@ -181,87 +181,166 @@ router.get('/visitors', async (_req, res) => {
 });
 
 /**
- * One-time / on-demand: rewrite junk GPS cities (e.g. Atlantic Ocean)
- * using IP geolocation for those visit rows.
+ * Backfill junk/unknown cities:
+ * 1) Reuse each visitor's last known real city (GPS/IP)
+ * 2) Reverse-geocode stored lat/lng
+ * 3) For non-VPN IPs, fill from IP lookup
+ * 4) For VPN without known city, keep city empty but ensure vpnExit* is set
  */
 router.post('/fix-geo', async (_req, res) => {
   try {
     const badCityRe = /ocean|sea|atlantic|pacific|arctic|antarctic|unknown|null|undefined/i;
-    const candidates = await Visit.find({
+    const missing = await Visit.find({
       $or: [
         { city: badCityRe },
         { state: badCityRe },
-        { city: null, geoSource: 'gps' },
+        { city: null },
         { city: { $in: ['', '—', '-', 'Unknown', 'Atlantic Ocean'] } },
       ],
-      ip: { $nin: [null, '', '—'] },
     })
-      .select('_id ip city state country countryCode geoSource isProxy isHosting')
-      .limit(2000)
+      .select('_id visitorId ip city state country countryCode latitude longitude isProxy isHosting vpnExitCity geoSource')
+      .limit(3000)
       .lean();
-
-    const byIp = new Map();
-    for (const row of candidates) {
-      const ip = String(row.ip || '').trim();
-      if (!ip || ip === '—') continue;
-      // Keep rows that already have a valid city
-      if (cleanPlaceName(row.city)) continue;
-      if (!byIp.has(ip)) byIp.set(ip, []);
-      byIp.get(ip).push(row._id);
-    }
 
     let updated = 0;
     let skipped = 0;
     const samples = [];
 
-    for (const [ip, ids] of byIp) {
+    // --- Pass 1: known city per visitorId ---
+    const visitorIds = [...new Set(missing.map((r) => r.visitorId).filter(Boolean))];
+    const knownByVisitor = new Map();
+    for (const visitorId of visitorIds) {
+      const prior = await Visit.findOne({
+        visitorId,
+        city: { $nin: [null, '', 'Unknown', 'Atlantic Ocean'] },
+      })
+        .sort({ createdAt: -1 })
+        .select('city state country countryCode geoSource')
+        .lean();
+      const city = cleanPlaceName(prior?.city);
+      const state = cleanPlaceName(prior?.state);
+      if (city || state) {
+        knownByVisitor.set(visitorId, {
+          city,
+          state,
+          country: prior.country || null,
+          countryCode: prior.countryCode || null,
+          geoSource: prior.geoSource === 'gps' ? 'gps' : 'known',
+        });
+      }
+    }
+
+    for (const row of missing) {
+      if (cleanPlaceName(row.city)) continue;
+      const known = knownByVisitor.get(row.visitorId);
+      if (!known) continue;
+      await Visit.updateOne(
+        { _id: row._id },
+        {
+          $set: {
+            city: known.city,
+            state: known.state,
+            country: known.country || row.country,
+            countryCode: known.countryCode || row.countryCode,
+            geoSource: known.geoSource,
+          },
+        },
+      );
+      updated += 1;
+      row.city = known.city;
+      if (samples.length < 10) {
+        samples.push({ id: row._id.toString(), via: 'visitor', city: known.city, state: known.state });
+      }
+    }
+
+    // --- Pass 2: reverse-geocode coords still missing city ---
+    const { reverseGeocode } = await import('../services/geoService.js');
+    for (const row of missing) {
+      if (cleanPlaceName(row.city)) continue;
+      if (!Number.isFinite(row.latitude) || !Number.isFinite(row.longitude)) continue;
+      const gps = await reverseGeocode(row.latitude, row.longitude);
+      if (!gps?.city && !gps?.state) continue;
+      await Visit.updateOne(
+        { _id: row._id },
+        {
+          $set: {
+            city: gps.city || null,
+            state: gps.state || null,
+            country: gps.country || row.country,
+            countryCode: gps.countryCode || row.countryCode,
+            geoSource: 'gps',
+          },
+        },
+      );
+      updated += 1;
+      row.city = gps.city;
+      if (samples.length < 10) {
+        samples.push({ id: row._id.toString(), via: 'gps', city: gps.city, state: gps.state });
+      }
+    }
+
+    // --- Pass 3: IP fill for remaining (non-VPN only for city; VPN gets vpnExit*) ---
+    const stillBad = missing.filter((r) => !cleanPlaceName(r.city));
+    const byIp = new Map();
+    for (const row of stillBad) {
+      const ip = String(row.ip || '').trim();
+      if (!ip || ip === '—') continue;
+      if (!byIp.has(ip)) byIp.set(ip, []);
+      byIp.get(ip).push(row);
+    }
+
+    for (const [ip, rows] of byIp) {
       const geo = await lookupGeoByIp(ip);
       const city = cleanPlaceName(geo.city);
       const state = cleanPlaceName(geo.state);
+      const vpnLike = Boolean(geo.isProxy || geo.isHosting);
       if (!city && !state) {
-        skipped += ids.length;
+        skipped += rows.length;
         continue;
       }
 
-      const vpnLike = Boolean(geo.isProxy || geo.isHosting);
-      const setDoc = {
-        city: city || null,
-        state: state || null,
-        country: geo.country || null,
-        countryCode: geo.countryCode || null,
-        isp: geo.isp || null,
-        org: geo.org || null,
-        isProxy: vpnLike,
-        isHosting: Boolean(geo.isHosting),
-        geoSource: 'ip',
-      };
-      if (vpnLike) {
-        setDoc.vpnExitCity = city;
-        setDoc.vpnExitState = state;
-        // For VPN exits keep visitor city unknown (same rule as live tracker)
-        setDoc.city = null;
-        setDoc.state = null;
-        setDoc.geoSource = 'unknown';
-      }
-
-      const result = await Visit.updateMany({ _id: { $in: ids } }, { $set: setDoc });
-      updated += result.modifiedCount || 0;
-      if (samples.length < 8) {
-        samples.push({
-          ip,
-          fromCount: ids.length,
-          city: setDoc.city,
-          state: setDoc.state,
-          vpnExitCity: setDoc.vpnExitCity || null,
-          country: setDoc.country,
-        });
+      for (const row of rows) {
+        const setDoc = vpnLike
+          ? {
+              vpnExitCity: city,
+              vpnExitState: state,
+              country: geo.country || row.country,
+              countryCode: geo.countryCode || row.countryCode,
+              isp: geo.isp || null,
+              isProxy: true,
+              isHosting: Boolean(geo.isHosting),
+              // keep city as-is (still unknown) — real city needs GPS / visitor memory
+            }
+          : {
+              city,
+              state,
+              country: geo.country || row.country,
+              countryCode: geo.countryCode || row.countryCode,
+              isp: geo.isp || null,
+              isProxy: false,
+              isHosting: Boolean(geo.isHosting),
+              geoSource: 'ip',
+            };
+        const result = await Visit.updateOne({ _id: row._id }, { $set: setDoc });
+        if (result.modifiedCount) updated += 1;
+        if (!vpnLike) row.city = city;
+        if (samples.length < 10) {
+          samples.push({
+            id: row._id.toString(),
+            via: vpnLike ? 'vpnExit' : 'ip',
+            city: vpnLike ? null : city,
+            state: vpnLike ? null : state,
+            vpnExitCity: vpnLike ? city : null,
+          });
+        }
       }
     }
 
     res.json({
       ok: true,
-      scanned: candidates.length,
+      scanned: missing.length,
       uniqueIps: byIp.size,
+      knownVisitors: knownByVisitor.size,
       updated,
       skipped,
       samples,

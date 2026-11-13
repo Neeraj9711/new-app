@@ -16,7 +16,7 @@ const visitSchema = new mongoose.Schema(
     org: { type: String, default: null },
     isProxy: { type: Boolean, default: false },
     isHosting: { type: Boolean, default: false },
-    geoSource: { type: String, default: 'ip', enum: ['ip', 'gps', 'unknown'] },
+    geoSource: { type: String, default: 'ip', enum: ['ip', 'gps', 'unknown', 'known'] },
     latitude: { type: Number, default: null },
     longitude: { type: Number, default: null },
     userAgent: { type: String, default: '' },

@@ -21,6 +21,28 @@ function shouldSkipDuplicate(visitorId, path) {
   return Boolean(prev && now - prev < DEDUPE_MS);
 }
 
+async function findKnownPlaceForVisitor(visitorId) {
+  if (!visitorId) return null;
+  const prior = await Visit.findOne({
+    visitorId,
+    city: { $nin: [null, '', 'Unknown', 'Atlantic Ocean'] },
+  })
+    .sort({ createdAt: -1 })
+    .select('city state country countryCode geoSource')
+    .lean();
+  if (!prior) return null;
+  const city = cleanPlaceName(prior.city);
+  const state = cleanPlaceName(prior.state);
+  if (!city && !state) return null;
+  return {
+    city,
+    state,
+    country: prior.country || null,
+    countryCode: prior.countryCode || null,
+    geoSource: prior.geoSource === 'gps' ? 'gps' : 'known',
+  };
+}
+
 router.post('/visit', async (req, res) => {
   try {
     const visitorId = String(req.body?.visitorId || '').trim().slice(0, 80);
@@ -60,7 +82,7 @@ router.post('/visit', async (req, res) => {
     let countryCode = ipGeo.countryCode || null;
     let geoSource = 'unknown';
 
-    // 1) Prefer valid client GPS city (reject "Atlantic Ocean" etc.)
+    // 1) Prefer valid client GPS city
     if (clientCity || clientState) {
       city = clientCity;
       state = clientState;
@@ -78,22 +100,25 @@ router.post('/visit', async (req, res) => {
       }
     }
 
-    // 3) Fall back to IP city when GPS missing/invalid and not a VPN exit
-    if (!city && !state && !vpnLike) {
-      city = ipGeo.city || null;
-      state = ipGeo.state || null;
-      country = ipGeo.country || country;
-      countryCode = ipGeo.countryCode || countryCode;
-      geoSource = city || state ? 'ip' : 'unknown';
-    }
-
-    // 4) If GPS city was junk/empty but IP has a real city (e.g. Bharti India), prefer IP
+    // 3) Non-VPN: use IP city
     if (!city && !vpnLike && (ipGeo.city || ipGeo.state)) {
       city = ipGeo.city || null;
       state = ipGeo.state || null;
       country = ipGeo.country || country;
       countryCode = ipGeo.countryCode || countryCode;
       geoSource = 'ip';
+    }
+
+    // 4) VPN / still unknown: reuse this visitor's last known real city (e.g. Dadri from earlier GPS)
+    if (!city) {
+      const known = await findKnownPlaceForVisitor(visitorId);
+      if (known) {
+        city = known.city;
+        state = known.state;
+        country = known.country || country;
+        countryCode = known.countryCode || countryCode;
+        geoSource = known.geoSource;
+      }
     }
 
     const visit = await Visit.create({
