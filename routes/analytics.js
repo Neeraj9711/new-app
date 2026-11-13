@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import Visit from '../models/Visit.js';
 import { getClientIp } from '../services/activityService.js';
-import { resolveRequestGeo, reverseGeocode } from '../services/geoService.js';
+import { cleanPlaceName, isValidLatLon, resolveRequestGeo, reverseGeocode } from '../services/geoService.js';
 
 const router = Router();
 
@@ -31,9 +31,9 @@ router.post('/visit', async (req, res) => {
     const screen = String(req.body?.screen || '').trim().slice(0, 32) || null;
     const latitude = Number(req.body?.latitude);
     const longitude = Number(req.body?.longitude);
-    const hasGps = Number.isFinite(latitude) && Number.isFinite(longitude);
-    const clientCity = String(req.body?.city || '').trim().slice(0, 80) || null;
-    const clientState = String(req.body?.state || '').trim().slice(0, 80) || null;
+    const hasGps = isValidLatLon(latitude, longitude);
+    const clientCity = cleanPlaceName(req.body?.city);
+    const clientState = cleanPlaceName(req.body?.state);
     const clientCountry = String(req.body?.country || '').trim().slice(0, 80) || null;
 
     if (!visitorId) {
@@ -51,7 +51,6 @@ router.post('/visit', async (req, res) => {
     const ipGeo = await resolveRequestGeo(req);
     const vpnLike = Boolean(ipGeo.isProxy || ipGeo.isHosting);
 
-    // VPN exit location (for reference only — not the visitor's real city)
     const vpnExitCity = vpnLike ? (ipGeo.city || null) : null;
     const vpnExitState = vpnLike ? (ipGeo.state || null) : null;
 
@@ -61,14 +60,14 @@ router.post('/visit', async (req, res) => {
     let countryCode = ipGeo.countryCode || null;
     let geoSource = 'unknown';
 
-    // 1) Prefer client-resolved GPS city (most accurate)
+    // 1) Prefer valid client GPS city (reject "Atlantic Ocean" etc.)
     if (clientCity || clientState) {
       city = clientCity;
       state = clientState;
       country = clientCountry || country;
       geoSource = 'gps';
     } else if (hasGps) {
-      // 2) Server reverse-geocode of GPS coordinates
+      // 2) Server reverse-geocode
       const gps = await reverseGeocode(latitude, longitude);
       if (gps?.city || gps?.state) {
         city = gps.city || null;
@@ -77,15 +76,25 @@ router.post('/visit', async (req, res) => {
         countryCode = gps.countryCode || countryCode;
         geoSource = 'gps';
       }
-    } else if (!vpnLike) {
-      // 3) Only trust IP city when NOT a VPN/proxy/hosting exit
+    }
+
+    // 3) Fall back to IP city when GPS missing/invalid and not a VPN exit
+    if (!city && !state && !vpnLike) {
       city = ipGeo.city || null;
       state = ipGeo.state || null;
       country = ipGeo.country || country;
       countryCode = ipGeo.countryCode || countryCode;
       geoSource = city || state ? 'ip' : 'unknown';
     }
-    // else: VPN without GPS → leave city/state unknown (don't show Mumbai as visitor city)
+
+    // 4) If GPS city was junk/empty but IP has a real city (e.g. Bharti India), prefer IP
+    if (!city && !vpnLike && (ipGeo.city || ipGeo.state)) {
+      city = ipGeo.city || null;
+      state = ipGeo.state || null;
+      country = ipGeo.country || country;
+      countryCode = ipGeo.countryCode || countryCode;
+      geoSource = 'ip';
+    }
 
     const visit = await Visit.create({
       visitorId,

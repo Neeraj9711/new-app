@@ -1,4 +1,10 @@
 import { getClientIp } from './activityService.js';
+import {
+  cityFromBigDataCloud,
+  cleanPlaceName,
+  isValidLatLon,
+  stateFromBigDataCloud,
+} from './geoPlace.js';
 
 const cache = new Map();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -59,8 +65,8 @@ async function lookupIpWhoIs(ip) {
   const looksVpn = /vpn|proxy|hosting|m247|digitalocean|cloudflare|amazon|google|ovh|hetzner/.test(text);
   return {
     ip,
-    city: data.city || null,
-    state: data.region || data.region_code || null,
+    city: cleanPlaceName(data.city),
+    state: cleanPlaceName(data.region || data.region_code),
     country: data.country || null,
     countryCode: data.country_code || null,
     isp,
@@ -78,8 +84,8 @@ async function lookupIpApiCom(ip) {
   if (!data || data.status !== 'success') return null;
   return {
     ip: data.query || ip,
-    city: data.city || null,
-    state: data.regionName || null,
+    city: cleanPlaceName(data.city),
+    state: cleanPlaceName(data.regionName),
     country: data.country || null,
     countryCode: data.countryCode || null,
     isp: data.isp || null,
@@ -122,35 +128,42 @@ export async function lookupGeoByIp(ip) {
 }
 
 export async function reverseGeocode(lat, lon) {
+  if (!isValidLatLon(lat, lon)) return null;
   const latitude = Number(lat);
   const longitude = Number(lon);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
 
-  // BigDataCloud (reliable city names, no API key for non-commercial)
   const bdc = await fetchJson(
     `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
     4000,
   );
-  if (bdc && (bdc.city || bdc.locality || bdc.principalSubdivision)) {
-    return {
-      city: bdc.city || bdc.locality || null,
-      state: bdc.principalSubdivision || null,
-      country: bdc.countryName || null,
-      countryCode: bdc.countryCode || null,
-      source: 'gps',
-    };
+  if (bdc) {
+    const city = cityFromBigDataCloud(bdc);
+    const state = stateFromBigDataCloud(bdc);
+    const country = bdc.countryName || null;
+    // Reject ocean / water-only results even if country is set
+    if (city || state) {
+      return {
+        city,
+        state,
+        country,
+        countryCode: bdc.countryCode || null,
+        source: 'gps',
+      };
+    }
   }
 
-  // Open-Meteo fallback
   const data = await fetchJson(
     `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}&language=en&format=json`,
     4000,
   );
   const place = data?.results?.[0];
   if (!place) return null;
+  const city = cleanPlaceName(place.name || place.admin2);
+  const state = cleanPlaceName(place.admin1);
+  if (!city && !state) return null;
   return {
-    city: place.name || place.admin2 || null,
-    state: place.admin1 || null,
+    city,
+    state,
     country: place.country || null,
     countryCode: place.country_code || null,
     source: 'gps',
@@ -161,3 +174,5 @@ export async function resolveRequestGeo(req) {
   const ip = getClientIp(req);
   return lookupGeoByIp(ip);
 }
+
+export { cleanPlaceName, isValidLatLon };
